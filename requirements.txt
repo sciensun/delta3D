@@ -8,3 +8,13 @@ imageio-ffmpeg
 scipy
 dearpygui
 lpips
+pandas
+openpyxl
+pillow
+pyyaml
+numpy
+torch
+open_clip_torch
+trimesh
+requests
+playwright

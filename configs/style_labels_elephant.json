@@ -1,0 +1,29 @@
+{
+  "label_names": [
+    "wooden",
+    "carved",
+    "ornamental",
+    "rounded",
+    "standard",
+    "realistic",
+    "simplified"
+  ],
+  "source_style": {
+    "wooden": 0.9,
+    "carved": 0.9,
+    "ornamental": 0.8,
+    "rounded": 0.5,
+    "standard": 0.2,
+    "realistic": 0.3,
+    "simplified": 0.2
+  },
+  "target_style": {
+    "wooden": 0.6,
+    "carved": 0.3,
+    "ornamental": 0.2,
+    "rounded": 0.4,
+    "standard": 0.8,
+    "realistic": 0.7,
+    "simplified": 0.6
+  }
+}

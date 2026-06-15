@@ -1,0 +1,47 @@
+animal_labels:
+  - lion
+  - deer
+  - dog
+  - cat
+  - bird
+  - bear
+  - horse
+  - ox
+  - goat_sheep
+  - unknown_animal
+
+material_labels:
+  - wood
+  - stone
+  - porcelain
+  - bronze
+  - concrete
+  - painted
+  - scanned_real_object
+  - unknown_material
+
+global_style_labels:
+  - realistic_scan
+  - classical_sculpture
+  - stylized_sculpture
+  - folk_art
+  - toy_like
+  - ornament
+  - low_poly_or_blocky
+  - smooth_porcelain_like
+
+deformation_tags:
+  - groove_carved
+  - faceted_blocky
+  - smooth_sculptural
+  - ornamental_relief
+  - simplified_anatomy
+  - exaggerated_proportion
+  - base_or_support
+  - realistic_reference
+
+target_role:
+  - source_style
+  - target_reference
+  - mixed
+  - exclude

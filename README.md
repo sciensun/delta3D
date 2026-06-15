@@ -211,3 +211,129 @@ And thanks to the authors of [3D Gaussians](https://repo-sam.inria.fr/fungraph/3
 }
 ```
 
+## Stylized Animal Model Labeling Tools
+
+This repository also includes small helper scripts for organizing preview images and generating candidate labels for stylized 3D animal deformation research. The labels are not final decisions; they are intended for manual correction.
+
+Expected inputs:
+
+```bash
+previews/      # one preview image per model
+models.xlsx    # model names plus GLB or Sketchfab URLs
+```
+
+Basic workflow:
+
+```bash
+mkdir -p previews
+# Put one preview image per model in previews/
+# Put the spreadsheet in the project root as models.xlsx
+
+bash run_label_pipeline.sh
+```
+
+The single-entry script runs the three steps below:
+
+```bash
+python build_manifest.py --image_dir previews --excel models.xlsx --out outputs/manifest.csv --match_mode order
+
+python auto_tag_images.py --manifest outputs/manifest.csv --vocab outputs/deformation_vocab.yaml --out outputs/labels_auto.xlsx --jsonl outputs/labels.jsonl
+
+python make_contact_sheet.py --manifest outputs/manifest.csv --labels outputs/labels_auto.xlsx --out outputs/contact_sheet.png
+```
+
+The auto-tagging step also writes `outputs/labels_for_manual.xlsx`, which is the editable manual review copy.
+
+Pipeline inputs you need to prepare:
+
+- `previews/`: put preview images here, one image per model.
+- `models.xlsx`: put this Excel file in the project root. It should contain model names and GLB or Sketchfab URLs.
+- Matching defaults to row order. To match by filename stem, run `MATCH_MODE=stem bash run_label_pipeline.sh`.
+- Existing outputs are protected. To regenerate them, run `OVERWRITE=true bash run_label_pipeline.sh`.
+- Custom paths are supported, for example `IMAGE_DIR=thumbs_300 EXCEL=my_models.xlsx OUT_DIR=outputs bash run_label_pipeline.sh`.
+
+Optional GLB utilities:
+
+```bash
+python download_glbs.py --manifest outputs/manifest.csv --out_dir glbs
+python extract_glb_features.py --manifest outputs/manifest.csv --glb_dir glbs --out outputs/geometry_features.csv
+```
+
+All generated files are protected by default. Pass `--overwrite` to replace an existing output file.
+
+## Dataset Downloader
+
+Use this pipeline when you have an Excel file of model links and want to build a local download folder. The downloader is conservative: it does not bypass paywalls, login restrictions, captcha, DRM, or website access controls. If a page requires login, purchase, manual confirmation, captcha, or lacks download permission, the row is recorded as `manual_required` or skipped.
+
+Inputs you prepare:
+
+- Put the spreadsheet in the project root as `models.xlsx`, or pass `--excel /path/to/file.xlsx`.
+- The spreadsheet may contain columns such as `model_id`, `name`, `title`, `url`, `sketchfab_url`, `fab_url`, `glb_url`, `download_url`, and `notes`.
+- Direct `.glb`, `.gltf`, `.zip`, `.obj`, and `.fbx` URLs are downloaded with `requests`.
+- Sketchfab/Fab/webpage links are opened with Playwright and only normal visible webpage download controls are used.
+
+Step 1: test the first 3 rows in the current terminal. This runs headless, which works on servers without an XServer:
+
+```bash
+/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --limit 3 --use_persistent_browser --debug
+```
+
+Step 2: run all rows:
+
+```bash
+/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --use_persistent_browser --debug
+```
+
+Use `--headful` only from a terminal with a graphical desktop/XServer, for example when you need to log in manually once and keep cookies in `.browser_profile`:
+
+```bash
+/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --limit 3 --headful --use_persistent_browser --debug
+```
+
+From Windows SSH, start an XServer such as VcXsrv/Xming/MobaXterm, connect with X11 forwarding, log in once, then run the downloader:
+
+```bash
+ssh -Y user@server
+cd /home/shichang/Deformable-3D-Gaussians
+/usr/bin/python browser_login.py --url https://sketchfab.com/login --browser_profile .browser_profile
+/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --limit 3 --headful --use_persistent_browser --debug --overwrite
+```
+
+After the login cookies are saved, later runs can usually be headless:
+
+```bash
+/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --use_persistent_browser --debug --overwrite
+```
+
+If Google/Epic/Apple login refuses the Playwright browser, use a Sketchfab API token instead. Get the token in your normal Windows browser from your Sketchfab account/developer settings, then pass it to the server:
+
+```bash
+cd /home/shichang/Deformable-3D-Gaussians
+export SKETCHFAB_API_TOKEN="paste_your_token_here"
+
+/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --limit 3 --debug --overwrite
+```
+
+With `SKETCHFAB_API_TOKEN` set, Sketchfab rows are attempted through the official download API first. Rows without download permission are still recorded as `manual_required`; the script does not bypass account, license, purchase, or permission restrictions.
+
+Step 3: inspect downloaded files:
+
+```bash
+/usr/bin/python inspect_downloads.py --downloads downloads --out outputs/download_manifest.csv
+```
+
+Step 4: optionally generate previews:
+
+```bash
+/usr/bin/python extract_glb_preview.py --manifest outputs/download_manifest.csv --out_dir previews_from_glb --size 300
+```
+
+Downloader outputs:
+
+- `downloads/`: one folder per model, containing `source.glb`, `source.zip`, `extracted/`, `metadata.json`, and related files when available.
+- `outputs/download_status.csv`: row-by-row download status.
+- `outputs/download_log.txt`: readable log.
+- `outputs/manual_required.csv`: rows that need manual action.
+- `outputs/debug_screenshots/`: screenshots and HTML snapshots for failed/debug rows.
+
+Repeated runs skip existing downloaded files unless `--overwrite` is passed.

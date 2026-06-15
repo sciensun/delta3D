@@ -1,4 +1,6 @@
 *.pyc
+__pycache__/
+**/__pycache__/
 .vscode
 output
 build
@@ -7,3 +9,16 @@ diff_rasterization/dist
 tensorboard_3d
 screenshots
 .idea
+
+# Local dataset/download artifacts
+.browser_profile/
+downloads/
+outputs/
+previews/
+thumbs_300/
+models.xlsx
+*.part
+
+# Local generated/large 3D assets
+assets/3D/
+assets/prepared/
