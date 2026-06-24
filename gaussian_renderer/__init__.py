@@ -11,10 +11,23 @@
 
 import torch
 import math
+import inspect
 from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 from scene.gaussian_model import GaussianModel
 from utils.sh_utils import eval_sh
 from utils.rigid_utils import from_homogenous, to_homogenous
+
+
+_RASTER_SETTINGS_FIELDS = set(getattr(GaussianRasterizationSettings, "_fields", ()))
+if not _RASTER_SETTINGS_FIELDS:
+    try:
+        _RASTER_SETTINGS_FIELDS = set(inspect.signature(GaussianRasterizationSettings).parameters.keys())
+    except (TypeError, ValueError):
+        _RASTER_SETTINGS_FIELDS = set()
+try:
+    _RASTERIZER_FORWARD_FIELDS = set(inspect.signature(GaussianRasterizer.forward).parameters.keys())
+except (TypeError, ValueError):
+    _RASTERIZER_FORWARD_FIELDS = set()
 
 
 def quaternion_multiply(q1, q2):
@@ -50,7 +63,7 @@ def render(viewpoint_camera, pc: GaussianModel, pipe, bg_color: torch.Tensor, d_
     tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
     tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
 
-    raster_settings = GaussianRasterizationSettings(
+    raster_settings_kwargs = dict(
         image_height=int(viewpoint_camera.image_height),
         image_width=int(viewpoint_camera.image_width),
         tanfovx=tanfovx,
@@ -64,6 +77,9 @@ def render(viewpoint_camera, pc: GaussianModel, pipe, bg_color: torch.Tensor, d_
         prefiltered=False,
         debug=pipe.debug,
     )
+    if "antialiasing" in _RASTER_SETTINGS_FIELDS:
+        raster_settings_kwargs["antialiasing"] = False
+    raster_settings = GaussianRasterizationSettings(**raster_settings_kwargs)
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
@@ -105,16 +121,26 @@ def render(viewpoint_camera, pc: GaussianModel, pipe, bg_color: torch.Tensor, d_
         colors_precomp = override_color
 
     # Rasterize visible Gaussians to image, obtain their radii (on screen).
-    rendered_image, radii, depth = rasterizer(
+    # Some rasterizer builds do not expose the repository's extra means2D_densify/depth API.
+    rasterizer_kwargs = dict(
         means3D=means3D,
         means2D=screenspace_points,
-        means2D_densify=screenspace_points_densify,
         shs=shs,
         colors_precomp=colors_precomp,
         opacities=opacity,
         scales=scales,
         rotations=rotations,
         cov3D_precomp=cov3D_precomp)
+    if "means2D_densify" in _RASTERIZER_FORWARD_FIELDS:
+        rasterizer_kwargs["means2D_densify"] = screenspace_points_densify
+    else:
+        screenspace_points_densify = screenspace_points
+    rasterizer_out = rasterizer(**rasterizer_kwargs)
+    if len(rasterizer_out) == 3:
+        rendered_image, radii, depth = rasterizer_out
+    else:
+        rendered_image, radii = rasterizer_out
+        depth = None
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
     # They will be excluded from value updates used in the splitting criteria.

@@ -1,4 +1,5 @@
 import os
+import re
 import warnings
 
 import numpy as np
@@ -8,6 +9,17 @@ from PIL import Image
 
 
 COMMON_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def _numbered_key8_index_from_name(image_name):
+    match = re.search(r"az(\d{3})", image_name)
+    if not match:
+        return None
+    az = int(match.group(1)) % 360
+    if az % 45 != 0:
+        return None
+    # Manual ChatGPT key8 pack uses 01:az000, 02:az045, ..., 08:az315.
+    return az // 45 + 1
 
 
 def _candidate_names(image_name, view_index=None):
@@ -21,8 +33,11 @@ def _candidate_names(image_name, view_index=None):
         if root.startswith("0") and "_" in root:
             parts = root.split("_", 1)
             names.extend(parts[1] + "_standard" + suffix for suffix in COMMON_EXTENSIONS)
-    if view_index is not None:
-        one_based = int(view_index) + 1
+    numbered_index = _numbered_key8_index_from_name(image_name)
+    if numbered_index is None and view_index is not None and "key8" in image_name.lower():
+        numbered_index = int(view_index) + 1
+    if numbered_index is not None:
+        one_based = numbered_index
         names.extend("{:02d}_standard{}".format(one_based, suffix) for suffix in COMMON_EXTENSIONS)
         names.extend("{:02d}{}".format(one_based, suffix) for suffix in COMMON_EXTENSIONS)
     seen = set()

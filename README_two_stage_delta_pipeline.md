@@ -14,18 +14,53 @@ ChatGPT-generated targets are weak references, not pixel-aligned ground truth. T
 
 ## Stage 0: Source 3DGS
 
-First train or load a source stylized 3DGS with the original repository pipeline. The source model should be available under `--model_path`, for example:
+The source assets live in:
+
+```text
+assets/3D/*.glb
+```
+
+A GLB is not a 3DGS checkpoint and cannot be loaded directly by `train_delta_mining.py`. First render the GLB, export an approximate Blender/NeRF-style image dataset, and train a source stylized 3DGS with the original repository pipeline.
+
+For the elephant:
+
+```bash
+bash scripts/prepare_source_3dgs_from_glb.sh \
+  --object_id big_carved_wooden_elephant_sculpture \
+  --render_mode full36 \
+  --resolution 1024
+```
+
+This prepares:
+
+```text
+assets/prepared/big_carved_wooden_elephant_sculpture/blender_full36_dataset/
+```
+
+Then train the source 3DGS:
+
+```bash
+python train.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_full36_dataset \
+  --model_path output/elephant_source \
+  --iterations 7000 \
+  --warm_up 0 \
+  --eval \
+  --is_blender
+```
+
+After source training, the source model should be available under `--model_path`, for example:
 
 ```text
 output/elephant_source/point_cloud/iteration_<N>/point_cloud.ply
 ```
 
-If you only have rendered key8/full36 images and need a minimal Blender-style dataset, use:
+If you already have rendered key8/full36 images and only need to export the approximate Blender-style dataset, use:
 
 ```bash
 python scripts/export_key8_to_blender_dataset.py \
-  --views_meta assets/prepared/big_carved_wooden_elephant_sculpture/renders_original/key8/views_meta.json \
-  --out_dir assets/prepared/big_carved_wooden_elephant_sculpture/blender_key8_dataset
+  --views_meta assets/prepared/big_carved_wooden_elephant_sculpture/renders_original/full36/views_meta.json \
+  --out_dir assets/prepared/big_carved_wooden_elephant_sculpture/blender_full36_dataset
 ```
 
 Warning: the rendered views are orthographic, while this repo's Blender loader expects perspective `camera_angle_x`. The helper writes an approximate perspective dataset only.
@@ -55,7 +90,7 @@ Example:
 
 ```bash
 python train_delta_mining.py \
-  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_key8_dataset \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_full36_dataset \
   --model_path output/elephant_source \
   --target_image_root assets/prepared/big_carved_wooden_elephant_sculpture/generated_standard/key8_manual \
   --object_id big_carved_wooden_elephant_sculpture \
@@ -101,7 +136,7 @@ Example:
 
 ```bash
 python train_style_distill.py \
-  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_key8_dataset \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_full36_dataset \
   --model_path output/elephant_source \
   --mined_delta_path output/elephant_source/mined_delta_latest.pt \
   --label_config configs/style_labels_elephant.json \

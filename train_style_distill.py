@@ -71,6 +71,13 @@ def save_interpolation(scene, gaussians, model, features, delta_z, pipe, backgro
 
 def training(dataset, opt, pipe, args):
     prepare_output(args)
+    point_cloud_dir = os.path.join(args.model_path, "point_cloud")
+    if args.load_iteration and not os.path.isdir(point_cloud_dir):
+        raise RuntimeError(
+            "Stage 2 distillation needs a trained source 3DGS at '{}'. "
+            "A GLB file cannot be loaded directly as GaussianModel. "
+            "Run Stage 0 source 3DGS training first, then rerun this script.".format(point_cloud_dir)
+        )
     gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians, load_iteration=args.load_iteration, shuffle=False)
 

@@ -7,6 +7,8 @@ import math
 import os
 import shutil
 
+import numpy as np
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -25,14 +27,22 @@ def camera_to_world(azimuth, elevation, distance):
         -distance * math.cos(az) * math.cos(el),
         distance * math.sin(el),
     ]
-    # Minimal approximate camera transform. This helper warns because the source
-    # renders are orthographic but the repo's Blender loader expects perspective.
-    return [
-        [1.0, 0.0, 0.0, loc[0]],
-        [0.0, 1.0, 0.0, loc[1]],
-        [0.0, 0.0, 1.0, loc[2]],
-        [0.0, 0.0, 0.0, 1.0],
-    ]
+    cam_pos = np.array(loc, dtype=np.float32)
+    forward = -cam_pos / (np.linalg.norm(cam_pos) + 1e-8)
+    up_guess = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+    right = np.cross(forward, up_guess)
+    if np.linalg.norm(right) < 1e-6:
+        right = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    right = right / (np.linalg.norm(right) + 1e-8)
+    up = np.cross(right, forward)
+    up = up / (np.linalg.norm(up) + 1e-8)
+
+    c2w = np.eye(4, dtype=np.float32)
+    c2w[:3, 0] = right
+    c2w[:3, 1] = up
+    c2w[:3, 2] = -forward
+    c2w[:3, 3] = cam_pos
+    return c2w.tolist()
 
 
 def main():

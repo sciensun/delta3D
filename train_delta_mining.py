@@ -94,6 +94,16 @@ def valid_target_cameras(cameras, target_root):
 
 def training(dataset, opt, pipe, args):
     prepare_output(args)
+    point_cloud_dir = os.path.join(args.model_path, "point_cloud")
+    if args.load_iteration and not os.path.isdir(point_cloud_dir):
+        raise RuntimeError(
+            "Stage 1 delta mining needs a trained source 3DGS at '{}'. "
+            "Your source GLB in assets/3D is not a GaussianModel yet. "
+            "First render/export a Blender dataset from the GLB, then run train.py to create "
+            "{}/iteration_<N>/point_cloud.ply. See README_two_stage_delta_pipeline.md.".format(
+                point_cloud_dir, point_cloud_dir
+            )
+        )
     gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians, load_iteration=args.load_iteration, shuffle=False)
     if not args.freeze_gaussians:
