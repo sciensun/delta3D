@@ -51,11 +51,15 @@ def candidate_original_paths(root, image_name):
     return [os.path.join(root, name) for name in dict.fromkeys(names)]
 
 
-def load_image_tensor(path, device="cuda"):
+def load_image_tensor(path, background, device="cuda"):
     image = Image.open(path)
     has_alpha = image.mode in ("RGBA", "LA") or "transparency" in image.info
     image = image.convert("RGBA" if has_alpha else "RGB")
     arr = np.asarray(image, dtype=np.float32) / 255.0
+    if arr.shape[-1] == 4:
+        alpha = arr[..., 3:4]
+        bg = np.asarray(background, dtype=np.float32).reshape(1, 1, 3)
+        arr = arr[..., :3] * alpha + bg * (1.0 - alpha)
     return torch.from_numpy(arr).permute(2, 0, 1).to(device)
 
 
@@ -120,7 +124,7 @@ def main():
                     break
             if original_path is None:
                 continue
-            original = load_image_tensor(original_path)
+            original = load_image_tensor(original_path, bg_color)
             source = render(cam, gaussians, pipe, background, 0.0, 0.0, 0.0, dataset.is_6dof)["render"].clamp(0, 1)
             original = resize_like(original, source)
             diff = (original[:3] - source).abs()

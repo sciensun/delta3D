@@ -114,8 +114,10 @@ def setup_scene(bpy, args):
     scene.render.film_transparent = args.transparent_background
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"
-    scene.view_settings.view_transform = "Filmic"
-    scene.view_settings.look = "Medium High Contrast"
+    # Use Standard color management so requested white/transparent backgrounds
+    # remain consistent with the NeRF/Blender loader's alpha compositing.
+    scene.view_settings.view_transform = "Standard"
+    scene.view_settings.look = "None"
     scene.view_settings.exposure = 0
     scene.view_settings.gamma = 1
 

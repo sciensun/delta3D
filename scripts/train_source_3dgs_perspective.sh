@@ -50,7 +50,8 @@ if [[ ! -f "${DATASET_DIR}/transforms_train.json" ]]; then
     --num_azimuth "${NUM_AZIMUTH}" \
     --elevations "${ELEVATIONS}" \
     --fov_degrees "${FOV_DEGREES}" \
-    --white_background
+    --white_background \
+    --transparent_background
 else
   echo "[1/2] Perspective dataset already exists: ${DATASET_DIR}"
 fi

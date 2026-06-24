@@ -127,7 +127,8 @@ if [[ "${RUN_RENDER}" -eq 1 ]]; then
       --num_azimuth "${NUM_AZIMUTH}" \
       --elevations "${ELEVATIONS}" \
       --fov_degrees "${FOV_DEGREES}" \
-      --white_background
+      --white_background \
+      --transparent_background
   fi
 fi
 
