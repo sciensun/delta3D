@@ -114,6 +114,7 @@ def training(dataset, opt, pipe, args):
         max_d_xyz=args.max_d_xyz,
         max_d_scaling=args.max_d_scaling,
         enable_rotation=args.enable_delta_rotation,
+        disable_d_scaling=args.disable_d_scaling,
     ).cuda()
     optimizer = torch.optim.Adam(free_delta.parameters(), lr=args.free_delta_lr)
     lpips_loss = OptionalLPIPS("cuda") if args.weak_target else None
@@ -156,6 +157,8 @@ def training(dataset, opt, pipe, args):
 
         delta_reg = (d_xyz ** 2).mean() + (d_scaling ** 2).mean()
         loss = loss + args.lambda_delta * delta_reg
+        if not args.disable_d_scaling and args.scale_positive_penalty > 0:
+            loss = loss + args.scale_positive_penalty * (F.relu(d_scaling) ** 2).mean()
         if args.lambda_smooth > 0:
             loss = loss + args.lambda_smooth * smoothness_loss(
                 gaussians.get_xyz, d_xyz, k=args.smooth_knn, sample=args.smooth_sample
@@ -187,7 +190,9 @@ def training(dataset, opt, pipe, args):
                     "lambda_mask": args.lambda_mask,
                     "lambda_delta": args.lambda_delta,
                     "lambda_smooth": args.lambda_smooth,
+                    "scale_positive_penalty": args.scale_positive_penalty,
                 },
+                "disable_d_scaling": args.disable_d_scaling,
             }
             latest = args.save_delta_path or os.path.join(args.model_path, "mined_delta_latest.pt")
             free_delta.save_delta(latest, gaussians, metadata)
@@ -217,6 +222,8 @@ if __name__ == "__main__":
     parser.add_argument("--save_delta_path", default=None)
     parser.add_argument("--freeze_gaussians", nargs="?", const=True, default=True, type=str2bool)
     parser.add_argument("--enable_delta_rotation", action="store_true", default=False)
+    parser.add_argument("--disable_d_scaling", action="store_true", default=False)
+    parser.add_argument("--scale_positive_penalty", type=float, default=0.0)
     parser.add_argument("--weak_target", nargs="?", const=True, default=True, type=str2bool)
     parser.add_argument("--load_iteration", type=int, default=-1)
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[1000, 2000, 3000])

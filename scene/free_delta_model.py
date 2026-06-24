@@ -7,14 +7,26 @@ import torch.nn as nn
 class FreeDeltaModel(nn.Module):
     """Per-Gaussian free deformation parameters for one fixed source 3DGS."""
 
-    def __init__(self, num_gaussians, max_d_xyz=0.03, max_d_scaling=0.08, enable_rotation=False, device="cuda"):
+    def __init__(
+        self,
+        num_gaussians,
+        max_d_xyz=0.03,
+        max_d_scaling=0.08,
+        enable_rotation=False,
+        disable_d_scaling=False,
+        device="cuda",
+    ):
         super().__init__()
         self.num_gaussians = num_gaussians
         self.max_d_xyz = max_d_xyz
         self.max_d_scaling = max_d_scaling
         self.enable_rotation = enable_rotation
+        self.disable_d_scaling = disable_d_scaling
         self.raw_d_xyz = nn.Parameter(torch.zeros(num_gaussians, 3, device=device))
-        self.raw_d_scaling = nn.Parameter(torch.zeros(num_gaussians, 3, device=device))
+        if disable_d_scaling:
+            self.register_parameter("raw_d_scaling", None)
+        else:
+            self.raw_d_scaling = nn.Parameter(torch.zeros(num_gaussians, 3, device=device))
         if enable_rotation:
             self.raw_d_rotation = nn.Parameter(torch.zeros(num_gaussians, 4, device=device))
         else:
@@ -22,7 +34,10 @@ class FreeDeltaModel(nn.Module):
 
     def forward(self):
         d_xyz = torch.tanh(self.raw_d_xyz) * self.max_d_xyz
-        d_scaling = torch.tanh(self.raw_d_scaling) * self.max_d_scaling
+        if self.disable_d_scaling:
+            d_scaling = torch.zeros((self.num_gaussians, 3), dtype=d_xyz.dtype, device=d_xyz.device)
+        else:
+            d_scaling = torch.tanh(self.raw_d_scaling) * self.max_d_scaling
         if self.enable_rotation:
             d_rotation = torch.tanh(self.raw_d_rotation)
         else:
