@@ -116,6 +116,81 @@ output/elephant_source/mined_delta_iter_<iteration>.pt
 
 The delta file stores `d_xyz`, `d_scaling`, optional `d_rotation`, source Gaussian positions, source scaling when available, and metadata.
 
+## Fixing Blurry Source 3DGS
+
+If the GLB render is sharp but the source 3DGS render is blurry, do not do Stage 1 or Stage 2 yet. Stage 1 cannot mine a meaningful geometric delta if the canonical source 3DGS has already lost the geometry.
+
+The previous orthographic-to-perspective approximate export can cause camera inconsistency and blurry source reconstruction. Prefer a true perspective Blender render where the rendered images and `transforms_train.json` use the exact same camera matrices.
+
+Use more views than key8/full36 when needed. Good starting points are 108 views (`36 x 3 elevations`) or 216 views (`72 x 3 elevations`). Train the source 3DGS longer, for example 30000 iterations, then re-run GLB-vs-source comparison. Only when the source is sharp should you rerun xyz-only delta mining. Do not distill the old blur-by-scale delta.
+
+Render a true perspective dataset:
+
+```bash
+python scripts/render_glb_perspective_dataset.py \
+  --input_glb assets/3D/big_carved_wooden_elephant_sculpture.glb \
+  --object_id big_carved_wooden_elephant_sculpture \
+  --out_dir assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset \
+  --resolution 1024 \
+  --num_azimuth 72 \
+  --elevations "-20,0,20" \
+  --fov_degrees 35 \
+  --white_background
+```
+
+Train source 3DGS from the perspective dataset:
+
+```bash
+python train.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset \
+  --model_path output/elephant_source_perspective \
+  --iterations 30000 \
+  --warm_up 0 \
+  --eval \
+  --is_blender \
+  --white_background \
+  --resolution 2 \
+  --densify_until_iter 7000
+```
+
+For a single-entry low-VRAM run, use:
+
+```bash
+bash scripts/run_perspective_source_pipeline.sh --train-source --low-vram
+```
+
+If this still runs out of memory, retry with `--train_resolution 4`, reduce render resolution to `--resolution 768`, or reduce views with `--num_azimuth 36 --elevations "-15,0,15"`.
+
+Run the quality gate:
+
+```bash
+python scripts/source_quality_gate.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset \
+  --model_path output/elephant_source_perspective \
+  --original_render_root assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset/images \
+  --out_dir output/elephant_source_perspective/debug_quality_gate \
+  --max_views 12
+```
+
+After source quality passes, rerun xyz-only Stage 1:
+
+```bash
+python train_delta_mining.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset \
+  --model_path output/elephant_source_perspective \
+  --target_image_root assets/prepared/big_carved_wooden_elephant_sculpture/generated_standard/key8_manual \
+  --iterations 3000 \
+  --max_d_xyz 0.08 \
+  --max_d_scaling 0.0 \
+  --disable_d_scaling \
+  --lambda_lpips 1.0 \
+  --lambda_rgb_weak 0.05 \
+  --lambda_mask 0.05 \
+  --lambda_delta 0.0005 \
+  --lambda_smooth 0.005 \
+  --save_delta_path output/elephant_source_perspective/mined_delta_xyz_only.pt
+```
+
 ## Stage 1 Debugging Order
 
 1. First compare original GLB render vs source 3DGS render. If source is blurry, fix source 3DGS before delta mining.

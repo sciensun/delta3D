@@ -12,6 +12,12 @@ COMMON_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 
 
 def _numbered_key8_index_from_name(image_name):
+    elev_match = re.search(r"elev([mp]?)(\d{3})", image_name)
+    if elev_match:
+        sign = -1 if elev_match.group(1) == "m" else 1
+        elevation = sign * int(elev_match.group(2))
+        if elevation != 0:
+            return None
     match = re.search(r"az(\d{3})", image_name)
     if not match:
         return None
