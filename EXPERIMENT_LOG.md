@@ -75,3 +75,39 @@ mode: high energy with insufficient directional agreement.
 - Command targeted `output/elephant_source_graphdeco/partfit_affine_soft_k32_refined/partfit_affine_xyz_only.pt`.
 - Rendering did not start because the active Python environment reports `torch.cuda.is_available() = False`.
 - No visual PASS/FAIL was inferred from this failed render attempt.
+
+## Stage 1.5 Reliability Experiment
+
+### Split preparation
+
+The deterministic definitions are A = key8 indices 0,2,4,6 and B = 1,3,5,7.
+The source dataset matches 3/4 views in A and 4/4 in B. `03_standard.png`
+(azimuth 090) has no exact source camera because that source frame was not
+rendered. No fallback or random remapping was used.
+
+### Split mining attempt
+
+The required A mining command was started with the Graphdeco source, foreground
+mask, xyz-only deformation, and the same weak-target weights as the full run.
+It stopped in `safe_state` because the active environment reports
+`torch.cuda.is_available() = False`. No subset delta, consistency metric,
+consensus, or denoising result is claimed from this run.
+
+The new CPU-side tools are syntax-checked and ready:
+
+- `scripts/compare_mined_delta_consistency.py`
+- `scripts/build_consensus_delta.py`
+- `scripts/denoise_consensus_delta.py`
+- `scripts/cluster_motion_aware_parts.py`
+
+The reliability decision is **UNAVAILABLE**, not strong/mixed/weak: split
+deltas do not yet exist and the target-camera set is incomplete.
+
+### CPU tool smoke test (not a research result)
+
+For interface validation only, the existing full-view delta was supplied twice
+as A and B. It produced cosine `1.0`, as expected for identical inputs, and
+was not used as evidence of split reproducibility. Consensus, denoising, and
+motion-part outputs from this smoke test live under
+`output/elephant_source_graphdeco/stage1_5_cpu_smoke/` and must not be used for
+Stage 2.

@@ -66,3 +66,12 @@ A fitted Delta* candidate must satisfy:
 - background Gaussians remain fixed.
 
 Stage 2 remains disabled until this gate passes.
+
+## Stage 1.5 Reliability
+
+The next reliability experiment is split-view consistency: independently mine
+xyz-only deltas from deterministic target subsets, compare their direction and
+magnitude on foreground Gaussians, then optionally form a confidence-gated
+consensus and graph-regularized teacher. The current target package is not fully
+matched: there is no exact elevation-0/azimuth-90 source frame for
+`03_standard.png`, so arbitrary sorted-order mapping is prohibited.
