@@ -191,6 +191,304 @@ python train_delta_mining.py \
   --save_delta_path output/elephant_source_perspective/mined_delta_xyz_only.pt
 ```
 
+## Single-View And Few-View Overfit Diagnostics
+
+Before further delta work, isolate whether source blur comes from the
+dataset/camera/background pipeline or from the full multi-view source training
+setup.
+
+Create tiny overfit subsets from the perspective dataset:
+
+```bash
+python scripts/make_overfit_subset.py \
+  --dataset_root assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent \
+  --out_dir assets/prepared/big_carved_wooden_elephant_sculpture/overfit_1view \
+  --num_views 1 \
+  --copy_images
+```
+
+```bash
+python scripts/make_overfit_subset.py \
+  --dataset_root assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent \
+  --out_dir assets/prepared/big_carved_wooden_elephant_sculpture/overfit_3view \
+  --num_views 3 \
+  --copy_images
+```
+
+```bash
+python scripts/make_overfit_subset.py \
+  --dataset_root assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent \
+  --out_dir assets/prepared/big_carved_wooden_elephant_sculpture/overfit_8view \
+  --num_views 8 \
+  --copy_images
+```
+
+Train the 1-view overfit:
+
+```bash
+python train.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/overfit_1view \
+  --model_path output/elephant_overfit_1view_noprune \
+  --iterations 5000 \
+  --warm_up 0 \
+  --eval \
+  --is_blender \
+  --white_background \
+  --resolution 1 \
+  --densify_until_iter 0
+```
+
+Run the quality gate against the same subset:
+
+```bash
+python scripts/source_quality_gate.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/overfit_1view \
+  --model_path output/elephant_overfit_1view_noprune \
+  --original_render_root assets/prepared/big_carved_wooden_elephant_sculpture/overfit_1view/images \
+  --out_dir output/elephant_overfit_1view_noprune/debug_quality_gate \
+  --max_views 1 \
+  --white_background
+```
+
+For the 1-view test, `--densify_until_iter 0` disables densification and
+pruning. This avoids a degenerate failure where single-view training prunes all
+Gaussians and the rasterizer backward pass receives empty tensors. Repeat the
+same pattern for `overfit_3view` and `overfit_8view`; if those runs also prune
+to zero, use the same no-prune setting first, then re-enable densification once
+the loader/camera path is verified.
+
+Interpretation:
+
+- If 1-view overfit is still blurry, there is likely a loader/render/background/training issue.
+- If 1-view is sharp but the full dataset is blurry, there is likely camera/transform inconsistency across views.
+- If 1-view and 3-view are sharp but 216-view is blurry, inspect camera distribution, camera transforms, train/test split, and mask/background consistency.
+- If all overfit tests are sharp but full reconstruction is not, try a different source builder or training recipe before any delta mining.
+
+## Acceptance Criteria
+
+Do not proceed to Stage 1 unless the source passes:
+
+- source render is visually sharp;
+- elephant silhouette is aligned with the GLB render;
+- trunk, ears, legs, carved body surface, and base are recognizable;
+- foreground mask IoU is preferably greater than `0.75`;
+- p95 scale / bbox diagonal is preferably less than `0.03`;
+- no large halo or fog around the silhouette.
+
+Do not proceed to Stage 2 unless:
+
+- source passes the source quality gate;
+- xyz-only delta x1 remains sharp;
+- amplified xyz-only delta shows coherent geometric motion;
+- there is no blur-by-scale behavior.
+
+## Using Graphdeco As Source 3DGS Builder
+
+Graphdeco official 3DGS can be used only to build a sharper canonical
+`G_sty`. The later delta pipeline remains unchanged:
+
+```text
+G_sty -> G_sty + Delta* -> B(F, delta_z)
+```
+
+First adapt the Graphdeco output into this repository's model layout. This does
+not modify the PLY contents; it only checks fields and copies or symlinks the
+PLY.
+
+```bash
+python scripts/adapt_graphdeco_source_to_delta3d.py \
+  --graphdeco_model_path /home/shichang/gs_outputs/elephant_graphdeco \
+  --graphdeco_iteration 30000 \
+  --delta3d_model_path output/elephant_source_graphdeco \
+  --source_dataset_path assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent \
+  --copy
+```
+
+Then verify that the adapted Graphdeco PLY is still sharp when loaded through
+delta3D's `GaussianModel` and rendered by delta3D's renderer:
+
+```bash
+python scripts/verify_adapted_source_render.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent \
+  --model_path output/elephant_source_graphdeco \
+  --load_iteration 30000 \
+  --original_render_root assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent/images \
+  --out_dir output/elephant_source_graphdeco/debug_verify_loaded_render \
+  --max_views 12 \
+  --white_background
+```
+
+If Graphdeco native render is sharp but the delta3D-loaded render is blurry,
+the adapter/loading path is the problem. If the delta3D-loaded render is sharp,
+proceed to xyz-only delta mining. Background differences are acceptable when
+the foreground is sharp and aligned.
+
+Optional target background standardization:
+
+```bash
+python scripts/composite_dataset_to_white.py \
+  --input_dir assets/prepared/big_carved_wooden_elephant_sculpture/generated_standard/key8_manual \
+  --out_dir assets/prepared/big_carved_wooden_elephant_sculpture/generated_standard/key8_manual_white \
+  --recursive
+```
+
+Run xyz-only Stage 1 from the adapted Graphdeco source:
+
+```bash
+python train_delta_mining.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent \
+  --model_path output/elephant_source_graphdeco \
+  --load_iteration 30000 \
+  --target_image_root assets/prepared/big_carved_wooden_elephant_sculpture/generated_standard/key8_manual_white \
+  --iterations 3000 \
+  --max_d_xyz 0.08 \
+  --max_d_scaling 0.0 \
+  --disable_d_scaling \
+  --lambda_lpips 1.0 \
+  --lambda_rgb_weak 0.05 \
+  --lambda_mask 0.05 \
+  --lambda_delta 0.0005 \
+  --lambda_smooth 0.005 \
+  --save_delta_path output/elephant_source_graphdeco/mined_delta_xyz_only.pt \
+  --white_background \
+  --composite_target_white \
+  --foreground_loss
+```
+
+After Stage 1, inspect amplified xyz-only delta:
+
+```bash
+python scripts/debug_render_mined_delta_amplified.py \
+  -s assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent \
+  --model_path output/elephant_source_graphdeco \
+  --load_iteration 30000 \
+  --mined_delta_path output/elephant_source_graphdeco/mined_delta_xyz_only.pt \
+  --out_dir output/elephant_source_graphdeco/debug_mined_delta_xyz_only_amplified \
+  --amplify 1 2 5 10 \
+  --white_background
+```
+
+Proceed to Stage 2 only if the adapted source render is sharp through the
+delta3D renderer, xyz-only delta x1 remains sharp, amplified xyz-only delta
+shows coherent geometric motion, there is no blur-by-scale, and the target
+trend is geometric rather than only background or appearance.
+
+## Structured Stage 1 Delta
+
+Once the Graphdeco source is accepted as canonical `G_sty`, Stage 1 should mine
+a structured, reusable `Delta*`:
+
+```text
+G_sty -> Delta* -> B(F,z)
+```
+
+Build a foreground Gaussian mask:
+
+```bash
+DATA=assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent
+MODEL=output/elephant_source_graphdeco
+```
+
+```bash
+python scripts/build_foreground_gaussian_mask.py \
+  -s "$DATA" \
+  --model_path "$MODEL" \
+  --load_iteration 30000 \
+  --out_dir "$MODEL" \
+  --threshold 0.5 \
+  --mask_dilate 7 \
+  --max_views 216
+```
+
+Cluster foreground Gaussians into part-like units:
+
+```bash
+python scripts/cluster_foreground_gaussians.py \
+  --model_path "$MODEL" \
+  --load_iteration 30000 \
+  --foreground_mask_path "$MODEL/foreground_mask.pt" \
+  --out_dir "$MODEL" \
+  --num_parts 16
+```
+
+Run foreground-only xyz delta mining:
+
+```bash
+python train_delta_mining.py \
+  -s "$DATA" \
+  --model_path "$MODEL" \
+  --load_iteration 30000 \
+  --target_image_root assets/prepared/big_carved_wooden_elephant_sculpture/generated_standard/key8_manual_white \
+  --iterations 3000 \
+  --max_d_xyz 0.08 \
+  --max_d_scaling 0.0 \
+  --disable_d_scaling \
+  --foreground_mask_path "$MODEL/foreground_mask.pt" \
+  --lambda_lpips 1.0 \
+  --lambda_rgb_weak 0.05 \
+  --lambda_mask 0.05 \
+  --lambda_delta 0.0005 \
+  --lambda_smooth 0.005 \
+  --save_delta_path "$MODEL/mined_delta_foreground_xyz_only.pt" \
+  --white_background \
+  --composite_target_white \
+  --foreground_loss
+```
+
+Run part-aware Stage 1 experimentation:
+
+```bash
+python train_delta_mining.py \
+  -s "$DATA" \
+  --model_path "$MODEL" \
+  --load_iteration 30000 \
+  --target_image_root assets/prepared/big_carved_wooden_elephant_sculpture/generated_standard/key8_manual_white \
+  --iterations 3000 \
+  --max_d_xyz 0.08 \
+  --max_d_scaling 0.0 \
+  --disable_d_scaling \
+  --foreground_mask_path "$MODEL/foreground_mask.pt" \
+  --part_labels_path "$MODEL/part_labels.pt" \
+  --num_parts 16 \
+  --part_assignment_temperature 0.15 \
+  --lambda_lpips 1.0 \
+  --lambda_rgb_weak 0.05 \
+  --lambda_mask 0.05 \
+  --lambda_delta 0.0005 \
+  --lambda_smooth 0.005 \
+  --save_delta_path "$MODEL/mined_delta_partaware_xyz_only.pt" \
+  --white_background \
+  --composite_target_white \
+  --foreground_loss
+```
+
+Evaluate delta quality:
+
+```bash
+python scripts/evaluate_delta_quality.py \
+  --mined_delta_path "$MODEL/mined_delta_partaware_xyz_only.pt" \
+  --foreground_mask_path "$MODEL/foreground_mask.pt" \
+  --part_labels_path "$MODEL/part_labels.pt" \
+  --out_json "$MODEL/delta_quality_partaware_xyz_only.json"
+```
+
+Render amplified delta:
+
+```bash
+python scripts/debug_render_mined_delta_amplified.py \
+  -s "$DATA" \
+  --model_path "$MODEL" \
+  --load_iteration 30000 \
+  --mined_delta_path "$MODEL/mined_delta_partaware_xyz_only.pt" \
+  --out_dir "$MODEL/debug_partaware_delta_amplified" \
+  --amplify 1 2 5 10 \
+  --white_background
+```
+
+Stage 1 passes only if at least 90% of delta energy lies in foreground,
+`d_scaling` is zero, x1/x2/x5 amplified renders remain coherent, movement is
+concentrated on interpretable parts, and the source stays sharp.
+
 ## Stage 1 Debugging Order
 
 1. First compare original GLB render vs source 3DGS render. If source is blurry, fix source 3DGS before delta mining.

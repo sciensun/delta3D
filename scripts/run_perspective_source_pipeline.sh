@@ -149,9 +149,21 @@ if [[ "${RUN_SOURCE_TRAIN}" -eq 1 ]]; then
   echo "[train-source] Running source 3DGS training"
   "${SOURCE_TRAIN_CMD[@]}"
 else
-  printf '\nNext source training command:\n'
-  printf ' %q' "${SOURCE_TRAIN_CMD[@]}"
-  printf '\n'
+  cat <<EOF
+
+Next source training command:
+
+python train.py \\
+  -s "${DATASET_DIR}" \\
+  --model_path "${SOURCE_MODEL}" \\
+  --iterations "${SOURCE_ITERS}" \\
+  --warm_up 0 \\
+  --eval \\
+  --is_blender \\
+  --white_background \\
+  --resolution "${TRAIN_RESOLUTION}" \\
+  --densify_until_iter "${DENSIFY_UNTIL}"
+EOF
 fi
 
 QUALITY_CMD=(
@@ -167,9 +179,17 @@ if [[ "${RUN_QUALITY}" -eq 1 ]]; then
   echo "[quality] Running source quality gate"
   "${QUALITY_CMD[@]}"
 else
-  printf '\nNext quality gate command:\n'
-  printf ' %q' "${QUALITY_CMD[@]}"
-  printf '\n'
+  cat <<EOF
+
+Next quality gate command:
+
+python scripts/source_quality_gate.py \\
+  -s "${DATASET_DIR}" \\
+  --model_path "${SOURCE_MODEL}" \\
+  --original_render_root "${DATASET_DIR}/images" \\
+  --out_dir "${SOURCE_MODEL}/debug_quality_gate" \\
+  --max_views 12
+EOF
 fi
 
 DELTA_PATH="${SOURCE_MODEL}/mined_delta_xyz_only.pt"
@@ -194,9 +214,25 @@ if [[ "${RUN_DELTA}" -eq 1 ]]; then
   echo "[delta] Running xyz-only Stage 1"
   "${DELTA_CMD[@]}"
 else
-  printf '\nNext xyz-only Stage 1 command:\n'
-  printf ' %q' "${DELTA_CMD[@]}"
-  printf '\n'
+  cat <<EOF
+
+Next xyz-only Stage 1 command:
+
+python train_delta_mining.py \\
+  -s "${DATASET_DIR}" \\
+  --model_path "${SOURCE_MODEL}" \\
+  --target_image_root "${TARGET_ROOT}" \\
+  --iterations "${DELTA_ITERS}" \\
+  --max_d_xyz 0.08 \\
+  --max_d_scaling 0.0 \\
+  --disable_d_scaling \\
+  --lambda_lpips 1.0 \\
+  --lambda_rgb_weak 0.05 \\
+  --lambda_mask 0.05 \\
+  --lambda_delta 0.0005 \\
+  --lambda_smooth 0.005 \\
+  --save_delta_path "${DELTA_PATH}"
+EOF
 fi
 
 DELTA_DEBUG_CMD=(
@@ -213,7 +249,16 @@ if [[ "${RUN_DELTA_DEBUG}" -eq 1 ]]; then
   echo "[delta-debug] Rendering amplified xyz-only delta"
   "${DELTA_DEBUG_CMD[@]}"
 else
-  printf '\nNext delta debug command:\n'
-  printf ' %q' "${DELTA_DEBUG_CMD[@]}"
-  printf '\n'
+  cat <<EOF
+
+Next delta debug command:
+
+python scripts/debug_render_mined_delta_amplified.py \\
+  -s "${DATASET_DIR}" \\
+  --model_path "${SOURCE_MODEL}" \\
+  --mined_delta_path "${DELTA_PATH}" \\
+  --out_dir "${SOURCE_MODEL}/debug_mined_delta_xyz_only_amplified" \\
+  --amplify 1 2 5 10 \\
+  --max_views 8
+EOF
 fi

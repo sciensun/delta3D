@@ -100,7 +100,14 @@ Approximate Blender dataset:
   ${DATASET_DIR}
 
 Train source 3DGS with:
-  python train.py -s ${DATASET_DIR} --model_path ${SOURCE_MODEL_PATH} --iterations 7000 --warm_up 0 --eval --is_blender
+
+python train.py \\
+  -s ${DATASET_DIR} \\
+  --model_path ${SOURCE_MODEL_PATH} \\
+  --iterations 7000 \\
+  --warm_up 0 \\
+  --eval \\
+  --is_blender
 
 After training, Stage 1 can load:
   ${SOURCE_MODEL_PATH}/point_cloud/iteration_<N>/point_cloud.ply

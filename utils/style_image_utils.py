@@ -73,7 +73,23 @@ def find_style_target_path(viewpoint_cam, style_target_root, split="train", requ
     )
 
 
-def load_style_target_rgba(viewpoint_cam, style_target_root, split="train", device="cuda", required=True):
+def composite_rgba_to_background(image, background=(1.0, 1.0, 1.0)):
+    if image.shape[0] != 4:
+        return image
+    bg = torch.tensor(background, dtype=image.dtype, device=image.device).view(3, 1, 1)
+    alpha = image[3:4].clamp(0.0, 1.0)
+    rgb = image[:3] * alpha + bg * (1.0 - alpha)
+    return torch.cat([rgb, alpha], dim=0)
+
+
+def load_style_target_rgba(
+    viewpoint_cam,
+    style_target_root,
+    split="train",
+    device="cuda",
+    required=True,
+    composite_white=False,
+):
     path = find_style_target_path(viewpoint_cam, style_target_root, split, required=required)
     if path is None:
         return None
@@ -84,11 +100,27 @@ def load_style_target_rgba(viewpoint_cam, style_target_root, split="train", devi
     image = image.convert("RGBA" if has_alpha else "RGB")
     image = np.array(image, dtype=np.float32) / 255.0
     tensor = torch.from_numpy(image).permute(2, 0, 1).to(device=device)
+    if composite_white:
+        tensor = composite_rgba_to_background(tensor, background=(1.0, 1.0, 1.0))
     return tensor
 
 
-def load_style_target_image(viewpoint_cam, style_target_root, split="train", device="cuda", required=True):
-    rgba = load_style_target_rgba(viewpoint_cam, style_target_root, split, device, required=required)
+def load_style_target_image(
+    viewpoint_cam,
+    style_target_root,
+    split="train",
+    device="cuda",
+    required=True,
+    composite_white=False,
+):
+    rgba = load_style_target_rgba(
+        viewpoint_cam,
+        style_target_root,
+        split,
+        device,
+        required=required,
+        composite_white=composite_white,
+    )
     if rgba is None:
         return None
     return rgba[:3]
