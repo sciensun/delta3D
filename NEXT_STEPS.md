@@ -16,6 +16,23 @@ DATA=assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_da
 DELTA=$MODEL/partfit_affine_soft_k32_refined/partfit_affine_xyz_only.pt
 ```
 
+## Updated Stage 1.5 Result
+
+The missing camera was resolved by rebuilding an eight-view train-only subset
+from the exact source frames. A/B mining completed, but the independent delta
+signal failed:
+
+- weighted cosine: `0.1176`
+- median per-Gaussian cosine: `0.0749`
+- magnitude Pearson: `0.6313`
+- direction agreement: `30.3%`
+- conflict fraction: `46.5%`
+
+Do not build a consensus teacher or proceed to Stage 2. Regenerate targets with
+stronger camera and geometry preservation, or add a correspondence/feature
+based geometric objective before rerunning Stage 1. More part clusters and
+forced energy normalization are not justified by this evidence.
+
 ```bash
 python scripts/interpolate_part_delta.py \
   -s "$DATA" \

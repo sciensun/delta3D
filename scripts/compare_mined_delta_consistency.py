@@ -55,6 +55,9 @@ def knn_edges(xyz, mask, k):
     idx = torch.where(mask)[0]
     if idx.numel() < 2:
         return None
+    if idx.numel() > 4096:
+        # Keep diagnostics bounded; pairwise consistency still uses every Gaussian.
+        idx = idx[torch.linspace(0, idx.numel() - 1, 4096).long()]
     d = torch.cdist(xyz[idx], xyz[idx])
     d.fill_diagonal_(float("inf"))
     nn = d.topk(min(k, idx.numel() - 1), largest=False).indices

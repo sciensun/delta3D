@@ -111,3 +111,33 @@ was not used as evidence of split reproducibility. Consensus, denoising, and
 motion-part outputs from this smoke test live under
 `output/elephant_source_graphdeco/stage1_5_cpu_smoke/` and must not be used for
 Stage 2.
+
+### Updated CUDA run and decision
+
+The exact eight elevation-0 key cameras were rebuilt into
+`assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset/`.
+Both deterministic subsets now match 4/4 views. The mined files are
+`output/elephant_source_graphdeco/mined_delta_fg_subset_A.pt` and
+`output/elephant_source_graphdeco/mined_delta_fg_subset_B.pt`.
+
+| Metric | Result |
+|---|---:|
+| weighted global cosine | 0.1176 |
+| confidence-weighted cosine | 0.1176 |
+| median per-Gaussian cosine | 0.0749 |
+| p25 / p75 per-Gaussian cosine | -0.4870 / 0.6035 |
+| magnitude Pearson | 0.6313 |
+| magnitude Spearman | 0.3623 |
+| direction agreement, cosine > 0.5 | 30.3% |
+| directional conflict fraction | 46.5% |
+| high-confidence cosine | 0.0516 |
+
+Both deltas are nonzero xyz-only signals; A mean norm is `0.01020`, B mean
+norm is `0.00611`, and both have exact zero `d_scaling`. Nevertheless, the
+direction is not reproducible across independent target subsets. Conflict
+fractions are approximately 44-50% across the existing K16 parts.
+
+Decision: **FAIL / weak-unreliable signal**. Consensus, denoising,
+motion-aware clustering, and structured refitting were skipped. The next
+research change must improve target geometric correspondence, not increase
+part-model complexity or force energy normalization. Stage 2 remains paused.

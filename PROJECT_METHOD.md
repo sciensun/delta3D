@@ -75,3 +75,9 @@ magnitude on foreground Gaussians, then optionally form a confidence-gated
 consensus and graph-regularized teacher. The current target package is not fully
 matched: there is no exact elevation-0/azimuth-90 source frame for
 `03_standard.png`, so arbitrary sorted-order mapping is prohibited.
+
+The exact-camera issue was subsequently resolved by rebuilding an eight-view
+train-only subset. Independent subset mining then produced weighted cosine
+`0.1176`, median per-Gaussian cosine `0.0749`, and 46.5% directional conflict.
+This is a weak/unreliable teacher signal. Consensus and Stage 2 remain paused;
+the next research change must improve target geometric correspondence.
