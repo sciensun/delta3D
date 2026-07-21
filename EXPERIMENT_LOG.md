@@ -2,6 +2,13 @@
 
 All entries use the current repository outputs. No Stage 2 run has been started.
 
+## Fixed-bank terminology
+
+`G_sty` is the adapted Graphdeco source. `G_ord_ref` is an independent ordinary
+reference and is not Gaussian-index paired with `G_sty`. `G_ord_canon` is fitted
+as `T(G_sty, Delta*)` after correspondence. No real `G_ord_ref` has yet been
+processed through the real correspondence pipeline.
+
 ## Source and Foreground Delta
 
 ### Graphdeco source adaptation
@@ -26,7 +33,9 @@ All entries use the current repository outputs. No Stage 2 run has been started.
 - `d_scaling` max norm: `0`.
 - `d_xyz` mean norm: `0.01716731`.
 - `d_xyz` p95 norm: `0.05971656`.
-- Result: foreground-only pseudo-delta PASS for structured fitting.
+- Result: foreground gating and zero `d_scaling` PASS as implementation
+  constraints, but the split-view reliability gate FAILS. This delta is not a
+  successful teacher and is unusable for Stage 2.
 
 ## Part-Fit Candidates
 
@@ -229,3 +238,29 @@ Added modular interfaces:
 
 No unified ordinary target 3DGS is currently available, so global alignment,
 dense matching, and real ordinary-target quality metrics are not claimed.
+
+## Fixed-bank Correspondence Refactor
+
+Added the `correspondence/` package with a validated source-indexed bundle,
+similarity alignment, anchor helpers, visibility/depth-lifting interfaces,
+multi-view robust fusion, quality metrics, and separate 3D/2D Huber losses.
+Added `CanonicalOrdinaryModel`, which preserves the source Gaussian count and
+ordering while exporting `G_ord_canon` and `Delta*`. The old paired-point
+alignment entry point is retained only as a compatibility wrapper; independent
+references use `align_ordinary_reference.py`.
+
+### CPU Regression
+
+- Similarity recovery on a known rigid plus uniform-scale point set: PASS,
+  recovered scale `2.0`, near-zero RMSE.
+- Unified bundle validation with `[V,N,2]` target observations and multi-view
+  fusion: PASS.
+- Synthetic body-roundness canonical export: PASS; `N=44764`, ordering and
+  PLY reload preserved, background delta zero, `d_scaling` zero.
+- Canonical KNN edge-length ratio: median `0.9999998`, p05 `0.8355`, p95
+  `1.2023`.
+
+The earlier GPU synthetic correspondence recovery remains the latest recovery
+metric: cosine `0.9614`, energy ratio `0.8835`, explained variance `0.9233`.
+The refactor has not claimed a new GPU recovery run. Stage 2 and part
+compression remain paused.

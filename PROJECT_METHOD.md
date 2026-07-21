@@ -10,9 +10,10 @@ The canonical source is a stylized Graphdeco 3DGS Gaussian bank:
 G_sty -> Delta* -> B(F, z)
 ```
 
-Stage 1 mines a pseudo deformation from weak manually generated target images.
-Stage 2 is intentionally paused until Stage 1 produces a structured, reusable
-Delta*.
+Stage 1 mines a pseudo deformation from correspondence-filtered ordinary
+reference observations. Weak manually generated target images are observations,
+not paired Gaussian ground truth. Stage 2 is intentionally paused until Stage 1
+produces a structured, reproducible Delta*.
 
 ## Current Source
 
@@ -25,15 +26,32 @@ output/elephant_source_graphdeco/
 It has 44,764 Gaussians and is loaded through the existing delta3D renderer.
 The source builder is not retrained in the current experiment.
 
+## Fixed-bank terminology
+
+- `G_sty`: the canonical stylized source 3DGS loaded by delta3D.
+- `G_ord_ref`: an independently generated ordinary reference model. It may have
+  different Gaussian count, indexing, and distribution, so its Gaussian IDs
+  must never be treated as paired with `G_sty`.
+- `G_ord_canon`: the ordinary model fitted on the unchanged `G_sty` bank:
+  `G_ord_canon = T(G_sty, Delta*)`. It preserves Gaussian count, IDs, source
+  foreground/background identity, source KNN graph, and source part identity.
+
+The actual paired training object is `(G_sty, G_ord_canon, Delta*)`.
+`G_ord_ref` is only the teacher used to construct correspondence and confidence.
+
 ## Stage 1
 
-The successful foreground-only pseudo-delta is:
+The historical foreground-only pseudo-delta is:
 
 ```text
 output/elephant_source_graphdeco/mined_delta_foreground_xyz_only.pt
 ```
 
-It has `d_scaling = 0` and forces all background Gaussian deformation to zero.
+Foreground gating and exact-zero `d_scaling` are successful implementation
+constraints: it has `d_scaling = 0` and forces all background Gaussian
+deformation to zero. However, independent target-view splits produced weighted
+cosine `0.1176`, median per-Gaussian cosine `0.0749`, and 46.5% directional
+conflict. It is **unusable for Stage 2** and is not a successful teacher.
 
 The structured fitting experiment approximates the free delta with:
 
@@ -106,6 +124,17 @@ non-rigidly warp away the intended stylized-to-ordinary deformation. The new
 Stage 1 correspondence interface accepts lifted target xyz positions and
 confidence, adds projected 2D-motion and 3D Huber losses, and keeps foreground
 gating, exact-zero background motion, and exact-zero Gaussian scaling.
+
+The correspondence hierarchy is explicit: similarity alignment, semantic
+anchors, shared-view 2D matches, depth lifting, robust multi-view fusion, and
+fixed-bank canonical fitting. Unmatched or low-confidence Gaussians remain
+unpaired and are handled by confidence weighting and graph regularization; they
+are not forced to have a target position.
+
+This method currently assumes topology-preserving continuous geometry changes.
+New or removed parts and major topology changes are out of scope. Once the
+canonical identity is established, densification, pruning, splitting, merging,
+and reordering are disabled.
 
 ## Synthetic Known-Delta Benchmark
 

@@ -5,16 +5,20 @@
 Do not proceed to Stage 2. No fitted translation or part-local affine delta
 currently satisfies the cosine, energy, and explained-variance acceptance gate.
 
-## Immediate Validation
+## Immediate Next Step: Build Correspondence
 
-When a CUDA-visible Python environment is available, render the best current
-candidate, K32 soft affine refined:
+Do not render the old K32 candidate, increase part count, or revisit the old
+missing-azimuth issue as an active task. Those instructions are historical
+because the split-view reliability gate already failed. The active task is to
+obtain one real `G_ord_ref`, align it with sparse semantic anchors, construct
+shared-view correspondence, and fit `G_ord_canon` on the fixed `G_sty` bank.
 
-```bash
-MODEL=output/elephant_source_graphdeco
-DATA=assets/prepared/big_carved_wooden_elephant_sculpture/blender_perspective_dataset_transparent
-DELTA=$MODEL/partfit_affine_soft_k32_refined/partfit_affine_xyz_only.pt
-```
+Use `scripts/align_ordinary_reference.py` for an independent reference model,
+`scripts/fit_similarity_from_corresponded_points.py` for paired point sets,
+the `correspondence/` package for source-indexed confidence bundles, and
+`scripts/build_canonical_ordinary.py` plus `scripts/validate_canonical_pair.py`
+for fixed-bank export checks. No real ordinary reference has yet been processed,
+so no real target quality or canonical ordinary reliability is claimed.
 
 ## Updated Stage 1.5 Result
 
@@ -88,7 +92,7 @@ semantic elephant parts; inspect `part_clusters_color.ply` and consider
 semantic or spatial part labels for ears, trunk, body, and base. Do not increase
 Stage 2 complexity or enable scaling until a compact Delta* passes the gate.
 
-## Stage 1.5 Reliability Before Further Modeling
+## Historical: Stage 1.5 Reliability Before Further Modeling
 
 1. Regenerate the missing exact source view at elevation 0, azimuth 90, or
    explicitly remove target `03_standard.png` and document a 7-view split.

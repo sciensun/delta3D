@@ -9,6 +9,8 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
+from correspondence.schema import CorrespondenceBundle
+from correspondence.losses import confidence_weighted_3d_huber, projected_motion_huber
 from arguments import ModelParams, OptimizationParams, PipelineParams
 from gaussian_renderer import render
 from scene import GaussianModel, Scene
@@ -96,25 +98,7 @@ def load_optional_mask(path, expected_n, device="cuda"):
 def load_correspondence(path, expected_n, device="cuda"):
     if not path:
         return None
-    payload = torch.load(path, map_location=device)
-    target_xyz = payload.get("target_xyz")
-    if target_xyz is None or target_xyz.shape != (expected_n, 3):
-        raise ValueError("correspondence target_xyz must have shape [N,3]")
-    confidence = payload.get("confidence", torch.ones(expected_n, device=device)).float().flatten()
-    if confidence.shape[0] != expected_n:
-        raise ValueError("correspondence confidence length does not match Gaussian count")
-    return target_xyz.float().to(device), confidence.clamp_min(0.0).to(device)
-
-
-def project_points(points, camera):
-    ones = torch.ones((points.shape[0], 1), dtype=points.dtype, device=points.device)
-    clip = torch.cat([points, ones], dim=1) @ camera.full_proj_transform
-    ndc = clip[:, :3] / clip[:, 3:4].clamp_min(1e-8)
-    xy = torch.stack([
-        (ndc[:, 0] * 0.5 + 0.5) * float(camera.image_width),
-        (1.0 - (ndc[:, 1] * 0.5 + 0.5)) * float(camera.image_height),
-    ], dim=1)
-    return xy
+    return CorrespondenceBundle.load(path, expected_n=expected_n, device=device)
 
 
 def save_effective_delta(path, gaussians, d_xyz, d_rotation, d_scaling, metadata, extra=None):
@@ -255,21 +239,29 @@ def training(dataset, opt, pipe, args):
         # Correspondence-guided geometry supervision complements weak image loss;
         # it is the synthetic/paired route for recovering a reproducible 3D delta.
         if correspondence is not None:
-            target_xyz, corr_confidence = correspondence
-            corr_mask = (corr_confidence > 0).float()
-            if foreground_mask_f is not None:
-                corr_mask = corr_mask * foreground_mask_f[:, 0]
-            denom = corr_confidence.mul(corr_mask).sum().clamp_min(1e-8)
+            target_xyz, corr_confidence = correspondence.target_xyz, correspondence.confidence
+            corr_mask = correspondence.valid_mask
+            if foreground_mask_f is not None: corr_mask = corr_mask & foreground_mask_f[:, 0].bool()
             if args.lambda_corr_3d > 0:
                 predicted_xyz = gaussians.get_xyz + d_xyz
-                corr_3d = F.huber_loss(predicted_xyz, target_xyz, reduction="none", delta=args.corr_huber_delta).mean(dim=-1)
-                loss = loss + args.lambda_corr_3d * (corr_3d * corr_confidence * corr_mask).sum() / denom
+                loss = loss + args.lambda_corr_3d * confidence_weighted_3d_huber(
+                    predicted_xyz, target_xyz, corr_confidence, corr_mask, args.corr_huber_delta_3d
+                )
             if args.lambda_corr_2d > 0:
-                source_xy = project_points(gaussians.get_xyz, viewpoint_cam)
-                target_xy = project_points(target_xyz, viewpoint_cam)
-                predicted_xy = project_points(gaussians.get_xyz + d_xyz, viewpoint_cam)
-                corr_2d = F.huber_loss(predicted_xy - source_xy, target_xy - source_xy, reduction="none", delta=args.corr_huber_delta).mean(dim=-1)
-                loss = loss + args.lambda_corr_2d * (corr_2d * corr_confidence * corr_mask).sum() / denom
+                view_index = correspondence.view_index(viewpoint_cam.image_name)
+                observed_xy = None
+                visibility = corr_mask
+                confidence_2d = corr_confidence
+                if view_index is not None and correspondence.target_xy is not None:
+                    observed_xy = torch.as_tensor(correspondence.target_xy[view_index], device="cuda", dtype=gaussians.get_xyz.dtype)
+                    if correspondence.visibility is not None: visibility = torch.as_tensor(correspondence.visibility[view_index], device="cuda")
+                    if correspondence.confidence_2d is not None: confidence_2d = torch.as_tensor(correspondence.confidence_2d[view_index], device="cuda")
+                loss = loss + args.lambda_corr_2d * projected_motion_huber(
+                    gaussians.get_xyz, d_xyz, viewpoint_cam, observed_xy, visibility,
+                    confidence_2d, args.corr_huber_delta_2d,
+                    oracle_target_xyz=None if observed_xy is not None else target_xyz,
+                    valid_mask=corr_mask,
+                )
 
         if foreground_mask_f is not None and foreground_mask_f.sum() > 0:
             delta_reg = ((d_xyz ** 2).sum(dim=-1, keepdim=True) * foreground_mask_f).sum() / foreground_mask_f.sum()
@@ -327,14 +319,18 @@ def training(dataset, opt, pipe, args):
                     "correspondence_path": args.correspondence_path,
                     "lambda_corr_3d": args.lambda_corr_3d,
                     "lambda_corr_2d": args.lambda_corr_2d,
-                    "corr_huber_delta": args.corr_huber_delta,
+                    "corr_huber_delta_3d": args.corr_huber_delta_3d,
+                    "corr_huber_delta_2d": args.corr_huber_delta_2d,
+                    "corr_2d_mode": "observed_target_xy" if correspondence is not None and correspondence.target_xy is not None else "oracle_projected_target_xyz",
                 }
             latest = args.save_delta_path or os.path.join(args.model_path, "mined_delta_latest.pt")
             extra = {}
             if foreground_mask is not None:
                 extra["foreground_mask"] = foreground_mask.detach().cpu()
             if correspondence is not None:
-                extra["correspondence_confidence"] = correspondence[1].detach().cpu()
+                extra["correspondence_confidence"] = correspondence.confidence.detach().cpu()
+                extra["correspondence_valid_mask"] = correspondence.valid_mask.detach().cpu()
+                extra["correspondence_support_count"] = correspondence.support_count.detach().cpu()
             if isinstance(delta_model, PartDeltaModel):
                 _, _, _, part_d_xyz, part_d_scaling, part_d_rotation = delta_model.forward()
                 extra.update(
@@ -389,7 +385,9 @@ if __name__ == "__main__":
     parser.add_argument("--correspondence_path", default=None)
     parser.add_argument("--lambda_corr_3d", type=float, default=0.0)
     parser.add_argument("--lambda_corr_2d", type=float, default=0.0)
-    parser.add_argument("--corr_huber_delta", type=float, default=0.01)
+    parser.add_argument("--corr_huber_delta_3d", type=float, default=0.01)
+    parser.add_argument("--corr_huber_delta_2d", type=float, default=1.0)
+    parser.add_argument("--corr_huber_delta", type=float, default=None, help="Legacy alias: sets both 3D and 2D deltas.")
     parser.add_argument("--foreground_mask_path", default=None)
     parser.add_argument("--part_labels_path", default=None)
     parser.add_argument("--num_parts", type=int, default=16)
@@ -398,6 +396,9 @@ if __name__ == "__main__":
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[1000, 2000, 3000])
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(sys.argv[1:])
+    if args.corr_huber_delta is not None:
+        args.corr_huber_delta_3d = args.corr_huber_delta
+        args.corr_huber_delta_2d = args.corr_huber_delta
     if args.iterations not in args.save_iterations:
         args.save_iterations.append(args.iterations)
     safe_state(args.quiet)

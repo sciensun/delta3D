@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Estimate rigid + preferred-uniform-scale alignment for two point sets.
+"""Deprecated compatibility wrapper for already paired point sets.
 
-This is a coordinate cleanup step for a unified ordinary Gaussian/point
-representation. It does not non-rigidly warp the target and does not replace
-the 3DGS representation.
+Use ``fit_similarity_from_corresponded_points.py`` for paired points or
+``align_ordinary_reference.py`` for an independent target with sparse anchors.
 """
 import argparse
 import json
 import os
+import sys
 
 import torch
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from correspondence.alignment import fit_similarity_from_corresponded_points, apply_similarity, transform_to_json
 
 
 def load_points(path):
@@ -23,21 +25,8 @@ def load_points(path):
 
 
 def fit_uniform_similarity(source, target):
-    if source.shape != target.shape or source.ndim != 2 or source.shape[1] != 3:
-        raise ValueError("source and target must have identical [N,3] shapes")
-    source_center = source.mean(0); target_center = target.mean(0)
-    xs = source - source_center; yt = target - target_center
-    covariance = yt.T @ xs / max(1, source.shape[0])
-    u, singular, vh = torch.linalg.svd(covariance)
-    correction = torch.eye(3)
-    if torch.det(u @ vh) < 0:
-        correction[-1, -1] = -1
-    rotation = u @ correction @ vh
-    scale = singular.mul(torch.diag(correction)).sum() / xs.square().sum().clamp_min(1e-8)
-    scale = scale.clamp_min(1e-8)
-    translation = target_center - scale * (rotation @ source_center)
-    aligned = scale * (source @ rotation.T) + translation
-    return aligned, rotation, scale, translation
+    transform = fit_similarity_from_corresponded_points(source, target)
+    return apply_similarity(source, transform), transform["rotation"], transform["scale"], transform["translation"]
 
 
 def main():
