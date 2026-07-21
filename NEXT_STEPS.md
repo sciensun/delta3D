@@ -33,6 +33,30 @@ stronger camera and geometry preservation, or add a correspondence/feature
 based geometric objective before rerunning Stage 1. More part clusters and
 forced energy normalization are not justified by this evidence.
 
+## Corrected Research Decision
+
+The synthetic benchmark separates two problems:
+
+1. image-only Stage 1 is inadequate even for a known paired deformation;
+2. correspondence-guided Stage 1 recovers the known xyz-only deformation and
+   passes the provisional benchmark gate.
+
+Therefore do not tune part count or start Stage 2. The next target experiment
+must first produce one unified ordinary 3DGS, then run global similarity
+alignment, editable semantic anchors, dense multi-view matching, and a
+correspondence quality gate. Only accepted lifted target xyz/confidence data
+should be passed to the new Stage 1 correspondence losses.
+
+New Stage 1 options:
+
+```bash
+--correspondence_path path/to/lifted_correspondence.pt \
+--lambda_corr_3d 10.0 \
+--lambda_corr_2d 1.0 \
+--max_d_scaling 0.0 \
+--disable_d_scaling
+```
+
 ```bash
 python scripts/interpolate_part_delta.py \
   -s "$DATA" \
@@ -114,3 +138,7 @@ python scripts/compare_mined_delta_consistency.py \
   --part_labels_path output/elephant_source_graphdeco/part_labels.pt \
   --output_dir output/elephant_source_graphdeco/stage1_5_consistency
 ```
+
+The older missing-azimuth instructions above are historical; the exact
+eight-view split has now been rebuilt and evaluated. The current blocker is
+target correspondence quality, not camera matching.

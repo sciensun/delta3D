@@ -141,3 +141,91 @@ Decision: **FAIL / weak-unreliable signal**. Consensus, denoising,
 motion-aware clustering, and structured refitting were skipped. The next
 research change must improve target geometric correspondence, not increase
 part-model complexity or force energy normalization. Stage 2 remains paused.
+
+## Synthetic Known-Delta Benchmark
+
+### Data and deformation teachers
+
+Created three controlled xyz-only teachers directly on the canonical 44,764
+Gaussian Graphdeco bank:
+
+- body roundness: 10,183 active foreground Gaussians;
+- ear expansion: 1,950 active foreground Gaussians;
+- segmented trunk bending: 2,956 active foreground Gaussians.
+
+All teachers have exact zero `d_scaling` and exact zero background delta. Each
+was rendered from the same eight exact key cameras. Target packages are under
+`output/elephant_source_graphdeco/synthetic_known_delta/targets_*`.
+
+### Body image-only recovery
+
+The existing weak LPIPS/RGB Stage 1 objective was run against the perfectly
+paired body-roundness renders. It failed to recover the known teacher:
+
+| Metric | Image-only result |
+|---|---:|
+| global cosine | 0.4740 |
+| energy ratio | 0.2739 |
+| explained variance | 0.2166 |
+| active-region cosine | 0.5133 |
+| background energy | 0 |
+| d_scaling | exact zero |
+
+This is a useful negative control: pixel/perceptual image loss is not enough
+for this source and small geometric change, even when target views are truly
+paired.
+
+### Correspondence-guided recovery
+
+Added `--correspondence_path`, `--lambda_corr_3d`, and `--lambda_corr_2d` to
+`train_delta_mining.py`. The synthetic correspondence contains exact target
+xyz positions; projected 2D motion is computed per active camera from the
+same camera matrices.
+
+Full body recovery output:
+
+```text
+output/elephant_source_graphdeco/synthetic_known_delta/mined_recovered_body_roundness_corr.pt
+output/elephant_source_graphdeco/synthetic_known_delta/body_roundness_corr_recovery_metrics.json
+```
+
+| Metric | Correspondence-guided result |
+|---|---:|
+| global cosine | 0.9614 |
+| energy ratio | 0.8835 |
+| explained variance | 0.9233 |
+| active-region cosine | 0.9772 |
+| background energy | 0 |
+| d_scaling | exact zero |
+
+Independent synthetic A/B split recovery also passed the directional gate:
+
+- confidence-weighted cosine: `0.9881`;
+- high-confidence cosine: `0.9808`;
+- magnitude Pearson: `0.9532`;
+- magnitude Spearman: `0.8364`;
+- full-foreground direction conflict: `28.0%`.
+
+The A/B outputs and diagnostic PLY are under
+`output/elephant_source_graphdeco/synthetic_known_delta/consistency_corr_ab/`.
+
+### Visual outputs
+
+- ground truth x1/x2/x5/x10:
+  `output/elephant_source_graphdeco/synthetic_known_delta/debug_ground_truth_amplified/`
+- correspondence recovery x1/x2/x5/x10:
+  `output/elephant_source_graphdeco/synthetic_known_delta/debug_recovered_corr_amplified/`
+
+x1/x2 remain sharp and coherent; x5 remains interpretable; x10 shows the
+expected large displacement/halo. No scale-blur is present.
+
+## Correspondence Interfaces
+
+Added modular interfaces:
+
+- `scripts/align_ordinary_target.py`: uniform similarity alignment only;
+- `scripts/define_semantic_anchors.py`: editable anchor schema;
+- `scripts/evaluate_correspondence_quality.py`: support/confidence/residual gate.
+
+No unified ordinary target 3DGS is currently available, so global alignment,
+dense matching, and real ordinary-target quality metrics are not claimed.

@@ -25,7 +25,13 @@ def load(path):
     if isinstance(x, dict):
         delta = x["d_xyz"].float()
         xyz = x.get("source_xyz")
-        conf = x.get("foreground_support", x.get("confidence"))
+        conf = x.get("foreground_support", x.get("confidence", x.get("correspondence_confidence")))
+        if conf is None and isinstance(x.get("metadata"), dict) and x["metadata"].get("correspondence_path"):
+            try:
+                corr = torch.load(x["metadata"]["correspondence_path"], map_location="cpu")
+                conf = corr.get("confidence")
+            except Exception:
+                pass
         fg = x.get("foreground_mask")
     else:
         delta, xyz, conf, fg = x.float(), None, None, None
@@ -108,7 +114,8 @@ def main():
     deltas = {k: v[0] for k, v in loaded.items()}
     names = list(deltas)
     confidences = {k: (v[2].float().flatten() if v[2] is not None else torch.ones(n)) for k, v in loaded.items()}
-    high_conf = fg & (torch.stack([confidences[k] for k in names]).mean(0) >= 0.5)
+    has_confidence = any(v[2] is not None for v in loaded.values())
+    high_conf = fg & (torch.stack([confidences[k] for k in names]).mean(0) >= 0.5) if has_confidence else torch.zeros_like(fg)
     if any(v.shape != (n, 3) for v in deltas.values()) or len(fg) != n:
         raise ValueError("all deltas and the foreground mask must have matching [N,3]/[N] shapes")
     pair_metrics = {}
@@ -170,7 +177,7 @@ def main():
               "pair_metrics": pair_metrics,
               "mean_pairwise_cosine": float(per[fg].mean()) if fg.any() else 0.0,
               "median_pairwise_cosine": float(per[fg].quantile(.5)) if fg.any() else 0.0,
-              "high_confidence_fraction": float((per[fg] > .5).float().mean()) if fg.any() else 0.0,
+              "high_confidence_fraction": float((per[high_conf] > .5).float().mean()) if high_conf.any() else None,
               "direction_conflict_fraction": float((per[fg] < 0).float().mean()) if fg.any() else 0.0,
               "part_metrics": part_metrics,
               "top_agreement_parts": sorted(part_metrics, key=lambda k: part_metrics[k]["mean_agreement"], reverse=True)[:5],

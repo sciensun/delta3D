@@ -27,6 +27,12 @@ def main():
         selected=[records[i] for i in indices]
         for r in selected:
             src=os.path.join(a.target_image_root,r["target"])
+            if not os.path.isfile(src) and r.get("source_image_name"):
+                for ext in (".png", ".jpg", ".jpeg"):
+                    candidate = os.path.join(a.target_image_root, r["source_image_name"] + ext)
+                    if os.path.isfile(candidate):
+                        src = candidate
+                        break
             if os.path.isfile(src): shutil.copy2(src,os.path.join(root,r["target"]))
         with open(os.path.join(root,"split_manifest.json"),"w") as f: json.dump({"split":label,"records":selected},f,indent=2)
         missing=[r for r in selected if not r["matched"]]
