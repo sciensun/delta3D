@@ -75,6 +75,43 @@ class FarnebackMatcher(ImageMatcherBackend):
                           {"opencv_version": cv2.__version__, **self.params})
 
 
+class DISMatcher(ImageMatcherBackend):
+    name = "opencv_dis"
+
+    def __init__(self, preset="medium"):
+        self.preset = preset
+
+    def match(self, source_rgb, target_rgb):
+        import cv2
+        source = _gray(source_rgb)
+        target = _gray(target_rgb)
+        presets = {"ultrafast": cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST,
+                   "fast": cv2.DISOPTICAL_FLOW_PRESET_FAST,
+                   "medium": cv2.DISOPTICAL_FLOW_PRESET_MEDIUM}
+        flow_engine = cv2.DISOpticalFlow_create(presets.get(self.preset, presets["medium"]))
+        forward = flow_engine.calc(source, target, None)
+        backward = flow_engine.calc(target, source, None)
+        h, w = source.shape
+        yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+        back_at_target = cv2.remap(backward, xx + forward[..., 0], yy + forward[..., 1],
+                                   cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+        cycle = np.linalg.norm(forward + back_at_target, axis=-1)
+        confidence = np.exp(-cycle / 2.0).astype(np.float32)
+        return MatchField(forward.astype(np.float32), backward.astype(np.float32),
+                          cycle.astype(np.float32), confidence, self.name,
+                          {"opencv_version": cv2.__version__, "preset": self.preset})
+
+
+def make_matcher(name):
+    if name in ("farneback", "opencv_farneback"):
+        return FarnebackMatcher()
+    if name in ("dis", "opencv_dis"):
+        return DISMatcher()
+    if name in ("learned", "raft", "dinov2"):
+        return LearnedMatcherBackend()
+    raise ValueError("unknown matcher backend: {}".format(name))
+
+
 class LearnedMatcherBackend(ImageMatcherBackend):
     """Interface placeholder for local DINO/RAFT/LoFTR adapters.
 

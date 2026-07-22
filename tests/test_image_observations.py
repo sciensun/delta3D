@@ -5,6 +5,9 @@ import torch
 from correspondence.image_observations import perturb_target
 from correspondence.match_filters import build_point_matches, robust_patch_flow
 from correspondence.matching_backends import FarnebackMatcher
+from correspondence.matching_backends import DISMatcher
+from correspondence.gaussian_visibility import camera_space_depth
+from correspondence.silhouette import sample_silhouette_observation
 from correspondence.observation_evaluation import endpoint_metrics
 from correspondence.schema import ObservationBundle
 
@@ -59,3 +62,23 @@ def test_metrics_and_deterministic_perturbation():
     assert int(b[0, 0, 0]) == 10
     metrics = endpoint_metrics(torch.tensor([[[1.0, 0.0]]]), torch.zeros(1, 1, 2), torch.ones(1, 1, dtype=torch.bool))
     assert metrics["median_epe"] == 1.0
+
+
+def test_dis_backend_and_explicit_camera_depth():
+    image = np.zeros((32, 32, 3), dtype=np.uint8)
+    image[8:24, 8:24] = 200
+    field = DISMatcher().match(image, image)
+    assert field.backend == "opencv_dis"
+    assert field.flow.shape == (32, 32, 2)
+    depth = camera_space_depth(torch.tensor([[0., 0., 2.], [0., 0., 4.]]), torch.eye(4))
+    assert torch.equal(depth, torch.tensor([2., 4.]))
+
+
+def test_silhouette_observation_is_distinct_from_point_target():
+    source = np.zeros((32, 32), dtype=bool)
+    target = np.zeros((32, 32), dtype=bool)
+    source[8:24, 8:24] = True
+    target[8:24, 10:26] = True
+    obs = sample_silhouette_observation(source, target, np.array([[8., 16.], [16., 16.]], np.float32))
+    assert "target_signed_distance" in obs and "target_gradient" in obs
+    assert "target_xy" not in obs

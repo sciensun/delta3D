@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from arguments import ModelParams
 from correspondence.image_observations import extract_image_observations
 from correspondence.cpu_cameras import load_cpu_source_and_cameras
+from correspondence.matching_backends import make_matcher
 from scene import GaussianModel, Scene
 from utils.general_utils import safe_state
 
@@ -28,6 +29,7 @@ def main():
     p.add_argument("--search_radius", type=int, default=2)
     p.add_argument("--min_confidence", type=float, default=0.15)
     p.add_argument("--max_cycle_error", type=float, default=3.0)
+    p.add_argument("--backend", choices=["farneback", "dis", "learned"], default="farneback")
     p.add_argument("--brightness", type=float, default=0.0)
     p.add_argument("--contrast", type=float, default=1.0)
     p.add_argument("--noise_std", type=float, default=0.0)
@@ -56,6 +58,7 @@ def main():
     bundle = extract_image_observations(
         source_xyz, cameras, a.source_image_root,
         a.target_image_root, foreground_mask_path=a.foreground_mask_path,
+        matcher=make_matcher(a.backend),
         device="cuda" if use_cuda else "cpu", search_radius=a.search_radius,
         min_confidence=a.min_confidence, max_cycle_error=a.max_cycle_error,
         target_perturb=perturb, perturb_seed=a.seed,

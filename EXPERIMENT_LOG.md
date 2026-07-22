@@ -372,3 +372,46 @@ using an explicit ordered key8 filename mapping. It produced overlays and a
 diagnostic observed_2d bundle with support coverage `.4675`; it has no stable
 style claim because there are no repeat generations or recovery validation.
 Artifacts: `output/elephant_source_graphdeco/historical_image_observation_diagnostic/`.
+
+## Geometry-Aware Audit and CPU Recovery
+
+The v2 audit corrected the denominator and now reports all-Gaussian,
+foreground, active, inactive, candidate, accepted-recall, confidence-rank,
+zero-motion, and displacement-stratified metrics. The fixed radius-2 wording
+was removed: the implemented fallback is a confidence-weighted local image
+neighborhood; renderer radii are reserved for the CUDA path. CPU visibility now
+uses explicit camera-space depth with a soft coarse-bin tolerance and records
+that approximation.
+
+Corrected Farneback active-region results:
+
+| teacher | foreground coverage | active coverage | active median EPE | active PCK@5 | accepted recall |
+|---|---:|---:|---:|---:|---:|
+| body roundness | 0.721 | 0.772 | 9.617 px | 0.193 | 0.381 |
+| ear expansion | 0.721 | 0.678 | 20.531 px | 0.091 | 0.371 |
+| trunk bending | 0.721 | 0.918 | 5.353 px | 0.478 | 0.474 |
+
+The zero-motion body active PCK@5 was `.162`, so the Farneback body result
+only slightly improves over identity. This correction shows that prior global
+PCK values were inflated by inactive/near-zero points.
+
+DIS (`opencv_dis`, OpenCV `4.13.0`, medium preset) improved body active median
+EPE to `3.548 px`, active PCK@5 to `.606`, and active accepted recall to `.573`,
+but still failed the `.80` gate. No learned backend was available: transformers,
+timm, kornia were absent, and torch/Hugging Face caches contained no RAFT,
+DINO, or LoFTR weights. No weights were downloaded.
+
+The CPU IRLS downstream diagnostic consumed only the saved body observed_2d
+bundle. Active recovery results were:
+
+| mode | active cosine | energy ratio | explained variance | background energy |
+|---|---:|---:|---:|---:|
+| point-only | 0.057 | 13.09 | -12.92 | 0 |
+| silhouette-only | 0.041 | 4.24 | -4.17 | 0 |
+| point + silhouette | 0.030 | 20.01 | -20.11 | 0 |
+
+Thus neither the extracted point observations nor the current silhouette
+constraint contain a recoverable 3D teacher under this baseline. No GPU Stage 1
+run was possible because the NVIDIA driver remained unavailable. The image
+observation route is not rejected in principle, but the current matcher and
+visibility/observation quality are insufficient.

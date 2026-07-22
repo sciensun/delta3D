@@ -15,14 +15,21 @@ def project_points(points, full_proj_transform, image_width, image_height):
     return xy, in_frame, w
 
 
+def camera_space_depth(points, world_view_transform):
+    import torch
+    points = torch.as_tensor(points)
+    ones = torch.ones((points.shape[0], 1), device=points.device, dtype=points.dtype)
+    camera = torch.cat([points, ones], dim=1) @ world_view_transform
+    return camera[:, 2]
+
+
 def estimate_projected_visibility(xy, depth, source_mask, foreground_mask=None,
-                                  depth_tolerance=0.03, bin_size=4):
+                                  depth_tolerance=0.15, bin_size=4):
     """Approximate visibility with source mask and a coarse depth z-buffer.
 
-    The renderer does not expose Gaussian IDs. This conservative estimate uses
-    the source silhouette and keeps the nearest projected Gaussian per coarse
-    pixel bin, with a relative depth tolerance. Metadata must state this is an
-    approximation.
+    The renderer does not expose Gaussian IDs on the CPU path. This approximate
+    estimate uses the source silhouette and keeps all layers within a soft
+    relative depth tolerance of the nearest Gaussian per coarse pixel bin.
     """
     xy = np.asarray(xy, dtype=np.float32)
     depth = np.asarray(depth, dtype=np.float32).reshape(-1)

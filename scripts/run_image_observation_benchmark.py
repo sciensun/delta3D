@@ -89,6 +89,7 @@ def main():
                 evaluate = [python, "scripts/evaluate_image_observations.py",
                              "--bundle_path", str(bundle), "--gt_delta_path", gt_path,
                              "-s", a.source_path, "--model_path", a.source_model_path,
+                             "--foreground_mask_path", a.foreground_mask_path,
                              "--load_iteration", str(a.load_iteration), "--output_path", str(match_metrics)]
                 run(evaluate, run_dir / "evaluate_observations.log")
             with match_metrics.open("r", encoding="utf-8") as f:

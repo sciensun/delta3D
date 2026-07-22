@@ -6,10 +6,12 @@ import numpy as np
 import torch
 from PIL import Image
 
-from .gaussian_visibility import estimate_projected_visibility, project_points
+from .gaussian_visibility import (camera_space_depth,
+                                  estimate_projected_visibility, project_points)
 from .match_filters import build_point_matches
 from .matching_backends import FarnebackMatcher
 from .schema import ObservationBundle
+from .silhouette import sample_silhouette_observation
 
 
 def load_rgb_mask(path, threshold=0.08):
@@ -50,7 +52,8 @@ def extract_image_observations(source_xyz, cameras, source_image_root, target_im
                                foreground_mask=None, foreground_mask_path=None,
                                matcher=None, device="cpu", search_radius=2,
                                min_confidence=0.15, max_cycle_error=3.0,
-                               target_perturb=None, perturb_seed=0):
+                               target_perturb=None, perturb_seed=0,
+                               include_silhouette=True):
     """Extract observed_2d without target geometry.
 
     `cameras` must expose full_proj_transform, image_width, image_height, and
@@ -61,7 +64,9 @@ def extract_image_observations(source_xyz, cameras, source_image_root, target_im
     if foreground_mask_path is not None:
         foreground_mask = torch.load(foreground_mask_path, map_location="cpu").bool().numpy()
     foreground_mask = None if foreground_mask is None else np.asarray(foreground_mask).astype(bool)
-    all_xy, all_vis, all_conf, names = [], [], [], []
+    all_xy, all_vis, all_conf, all_candidates, all_cycle, names = [], [], [], [], [], []
+    silhouette = {"valid": [], "source_boundary_distance": [], "source_gradient": [],
+                  "target_signed_distance": [], "target_gradient": []}
     per_view = []
     for camera in cameras:
         source_path = find_image(source_image_root, camera.image_name)
@@ -74,7 +79,7 @@ def extract_image_observations(source_xyz, cameras, source_image_root, target_im
             target_rgb = cv2.resize(target_rgb, (width, height), interpolation=cv2.INTER_AREA)
             target_mask = cv2.resize(target_mask.astype(np.uint8), (width, height), interpolation=cv2.INTER_NEAREST).astype(bool)
         target_rgb = perturb_target(target_rgb, target_perturb,
-                                    seed=perturb_seed + len(names))
+                                    seed=perturb_seed + len(all_xy))
         if target_perturb and target_perturb.get("mask_erode", 0):
             import cv2
             kernel = np.ones((3, 3), np.uint8)
@@ -84,10 +89,14 @@ def extract_image_observations(source_xyz, cameras, source_image_root, target_im
         xy, in_frame, clip_w = project_points(source_xyz, camera.full_proj_transform,
                                                camera.image_width, camera.image_height)
         xy_cpu = xy.detach().cpu().numpy()
-        # clip_w is used as a positive-depth proxy when the camera does not
-        # expose a world-view z buffer to this CPU-side matcher.
+        if hasattr(camera, "world_view_transform"):
+            depth = camera_space_depth(source_xyz, camera.world_view_transform)
+            visibility_method = "projected_foreground_soft_camera_depth"
+        else:
+            depth = clip_w
+            visibility_method = "projected_foreground_soft_clip_w_approximation"
         visible = estimate_projected_visibility(
-            xy_cpu, clip_w.detach().cpu().numpy(), source_mask,
+            xy_cpu, depth.detach().cpu().numpy(), source_mask,
             foreground_mask=foreground_mask, bin_size=4,
         ) & in_frame.detach().cpu().numpy()
         target_xy, valid, confidence, cycle = build_point_matches(
@@ -97,7 +106,15 @@ def extract_image_observations(source_xyz, cameras, source_image_root, target_im
         )
         all_xy.append(target_xy)
         all_vis.append(valid)
+        all_candidates.append(visible)
         all_conf.append(confidence * valid.astype(np.float32))
+        all_cycle.append(cycle)
+        if include_silhouette:
+            obs = sample_silhouette_observation(source_mask, target_mask, xy_cpu)
+            if foreground_mask is not None:
+                obs["valid"] = obs["valid"] & foreground_mask
+            for key in silhouette:
+                silhouette[key].append(obs[key])
         names.append(camera.image_name)
         per_view.append({"camera_name": camera.image_name,
                          "valid_count": int(valid.sum()),
@@ -115,11 +132,17 @@ def extract_image_observations(source_xyz, cameras, source_image_root, target_im
         observation_mode="observed_2d",
         metadata={
             "extraction": "image_derived",
-            "visibility_method": "projected_foreground_coarse_zbuffer",
+            "visibility_method": visibility_method,
+            "aggregation": "confidence_weighted_local_image_neighborhood",
             "matcher": matcher.name,
             "matcher_metadata": getattr(matcher, "params", {}),
             "target_xyz_in_optimizer_input": False,
             "per_view": per_view,
         },
+        candidate_visibility_2d=torch.from_numpy(np.stack(all_candidates)).bool(),
+        match_error_2d=torch.from_numpy(np.stack(all_cycle)).float(),
+        silhouette_observations={
+            key: torch.from_numpy(np.stack(value)) for key, value in silhouette.items()
+        } if include_silhouette else None,
     ).validate()
     return bundle

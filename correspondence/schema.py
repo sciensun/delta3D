@@ -19,6 +19,9 @@ class ObservationBundle:
     visibility_2d: object = None
     confidence_2d: object = None
     support_count_2d: object = None
+    candidate_visibility_2d: object = None
+    match_error_2d: object = None
+    silhouette_observations: object = None
     reprojection_residual: object = None
     target_xyz: object = None
     valid_3d_mask: object = None
@@ -59,6 +62,8 @@ class ObservationBundle:
         if valid_3d is None and target_xyz is not None and confidence_3d is not None:
             valid_3d = confidence_3d
         support_2d = payload.get("support_count_2d", payload.get("support_count"))
+        candidate_visibility = payload.get("candidate_visibility_2d")
+        match_error = payload.get("match_error_2d")
         residual = payload.get("reprojection_residual", payload.get("residual_3d"))
         if target_xy is not None:
             target_xy = torch.as_tensor(target_xy, device=device).float()
@@ -68,6 +73,10 @@ class ObservationBundle:
             confidence_2d = torch.as_tensor(confidence_2d, device=device).float()
         if support_2d is not None:
             support_2d = torch.as_tensor(support_2d, device=device).long().flatten()
+        if candidate_visibility is not None:
+            candidate_visibility = torch.as_tensor(candidate_visibility, device=device).bool()
+        if match_error is not None:
+            match_error = torch.as_tensor(match_error, device=device).float()
         if residual is not None:
             residual = torch.as_tensor(residual, device=device).float().flatten()
         if valid_3d is not None:
@@ -80,6 +89,9 @@ class ObservationBundle:
             visibility_2d=visibility,
             confidence_2d=confidence_2d,
             support_count_2d=support_2d,
+            candidate_visibility_2d=candidate_visibility,
+            match_error_2d=match_error,
+            silhouette_observations=payload.get("silhouette_observations"),
             reprojection_residual=residual,
             target_xyz=target_xyz,
             valid_3d_mask=valid_3d,
@@ -122,6 +134,10 @@ class ObservationBundle:
                     raise ValueError("{} must have shape [V,N]".format(name))
             if self.support_count_2d is not None and self.support_count_2d.shape != (n,):
                 raise ValueError("support_count_2d must have length N")
+            for name, value in (("candidate_visibility_2d", self.candidate_visibility_2d),
+                                ("match_error_2d", self.match_error_2d)):
+                if value is not None and value.shape != (views, n):
+                    raise ValueError("{} must have shape [V,N]".format(name))
             if self.reprojection_residual is not None and self.reprojection_residual.shape != (n,):
                 raise ValueError("reprojection_residual must have length N")
         for name, value in (("valid_3d_mask", self.valid_3d_mask), ("confidence_3d", self.confidence_3d)):
@@ -146,6 +162,9 @@ class ObservationBundle:
             "visibility_2d": None if self.visibility_2d is None else self.visibility_2d.detach().cpu(),
             "confidence_2d": None if self.confidence_2d is None else self.confidence_2d.detach().cpu(),
             "support_count_2d": None if self.support_count_2d is None else self.support_count_2d.detach().cpu(),
+            "candidate_visibility_2d": None if self.candidate_visibility_2d is None else self.candidate_visibility_2d.detach().cpu(),
+            "match_error_2d": None if self.match_error_2d is None else self.match_error_2d.detach().cpu(),
+            "silhouette_observations": self.silhouette_observations,
             "reprojection_residual": None if self.reprojection_residual is None else self.reprojection_residual.detach().cpu(),
             "target_xyz": None if self.target_xyz is None else self.target_xyz.detach().cpu(),
             "valid_3d_mask": None if self.valid_3d_mask is None else self.valid_3d_mask.detach().cpu(),

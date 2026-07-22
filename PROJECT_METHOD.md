@@ -183,3 +183,10 @@ image-derived bundles.
 Oracle target projections remain a synthetic upper bound. Image-derived target
 observations are matcher output. Real generated target observations require
 repeated quality-controlled views and have not produced a stable style delta.
+
+The corrected evaluation must separate all-Gaussian support, foreground support,
+active-region support, accepted-match recall, zero-motion baseline, and
+displacement strata. Global PCK is not a valid local-teacher criterion because
+inactive points can dominate it. A CPU IRLS reprojection diagnostic and a
+distinct signed-distance silhouette observation are implemented for downstream
+diagnosis; neither currently recovers the synthetic body delta reliably.

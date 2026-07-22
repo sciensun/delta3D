@@ -169,6 +169,12 @@ python scripts/run_historical_image_observation_diagnostic.py
 It creates overlays and a diagnostic bundle only; it does not claim real target
 alignment or stable style transfer.
 
+The corrected active-region audit is stricter: Farneback body active PCK@5 is
+`0.193` (median EPE `9.617 px`), ear is `.091`, and trunk is `.478`. DIS
+improves body active PCK@5 to `.606` but still fails. CPU downstream recovery
+active cosine is `.057` point-only, `.041` silhouette-only, and `.030` hybrid.
+These results show why global PCK must not be used for local style teachers.
+
 ## Actual Interfaces
 
 Load a legacy synthetic oracle correspondence bundle:

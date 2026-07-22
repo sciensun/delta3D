@@ -97,6 +97,12 @@ backend or stronger visibility/mask model until the body synthetic observation
 gate passes, then run GPU Stage 1 and A/B recovery. Only after that generate
 three real repeated target sets from the prepared pilot manifest.
 
+This iteration corrected support denominators and added DIS plus signed-distance
+silhouette observations. Corrected Farneback active PCK@5 was body `.193`, ear
+`.091`, trunk `.478`; DIS body `.606`. CPU active delta cosine was `.057`
+point-only, `.041` silhouette-only, `.030` hybrid. No CUDA driver was present,
+so differentiable Stage 1 was not run.
+
 ## Artifacts
 
 `README.md`, `docs/UPSTREAM_README.md`, `style_data/`, `correspondence/`,

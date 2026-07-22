@@ -174,3 +174,14 @@ The first real pilot layout is prepared at
 `assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/`;
 it contains three empty repeat folders and a manifest, with no fabricated
 target images.
+
+## Active Research Decision
+
+Do not run Stage 1 or Stage 2 from current image-derived bundles. Corrected
+active-region metrics fail for all three teachers. DIS is better than Farneback
+but body active PCK@5 is only `.606`; point-only, silhouette-only, and hybrid
+CPU recovery have active cosine `.057/.041/.030`. The immediate next decision
+is to obtain a genuinely stronger local learned matcher with cached weights or
+improve source visibility/radius contribution extraction, then rerun the same
+active-region and CPU downstream gates. CUDA must be restored before comparing
+with differentiable Stage 1.

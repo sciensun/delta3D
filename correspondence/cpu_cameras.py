@@ -10,10 +10,11 @@ from utils.graphics_utils import getWorld2View2, getProjectionMatrix
 
 
 class CpuCamera:
-    def __init__(self, image_name, width, height, full_proj_transform):
+    def __init__(self, image_name, width, height, world_view_transform, full_proj_transform):
         self.image_name = image_name
         self.image_width = width
         self.image_height = height
+        self.world_view_transform = world_view_transform
         self.full_proj_transform = full_proj_transform
 
 
@@ -32,7 +33,7 @@ def load_cpu_source_and_cameras(source_path, model_path, load_iteration=30000):
         world = torch.tensor(getWorld2View2(R, T), dtype=torch.float32).transpose(0, 1)
         proj = getProjectionMatrix(znear=0.01, zfar=100.0,
                                    fovX=angle_x, fovY=angle_x).transpose(0, 1)
-        cameras.append(CpuCamera(Path(frame["file_path"]).stem, width, height, world @ proj))
+        cameras.append(CpuCamera(Path(frame["file_path"]).stem, width, height, world, world @ proj))
     ply_path = Path(model_path) / "point_cloud" / ("iteration_{}".format(load_iteration)) / "point_cloud.ply"
     if not ply_path.exists():
         raise FileNotFoundError("canonical source PLY not found: {}".format(ply_path))
