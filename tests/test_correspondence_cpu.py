@@ -16,10 +16,15 @@ def test_similarity_and_bundle_roundtrip(tmp_path):
     candidates = torch.stack([target, target + 0.01 * torch.randn_like(target)])
     fused = fuse_target_candidates(candidates, torch.ones(2, 4), torch.ones(2, 4))
     bundle = CorrespondenceBundle(
-        source, fused["target_xyz"], fused["valid_mask"], fused["confidence"],
-        fused["support_count"], fused["residual_3d"], fused["directional_variance"],
-        target_xy=torch.zeros(2, 4, 2), visibility=torch.ones(2, 4),
-        confidence_2d=torch.ones(2, 4), camera_names=["a", "b"],
+        source_xyz=source,
+        target_xyz=fused["target_xyz"],
+        valid_3d_mask=fused["valid_mask"],
+        confidence_3d=fused["confidence"],
+        target_xy=torch.zeros(2, 4, 2),
+        visibility_2d=torch.ones(2, 4),
+        confidence_2d=torch.ones(2, 4),
+        camera_names=["a", "b"],
+        observation_mode="hybrid",
     )
     path = tmp_path / "bundle.pt"
     bundle.save(path)

@@ -2,6 +2,7 @@ import os
 import sys
 import uuid
 import warnings
+import json
 from argparse import ArgumentParser, Namespace
 from random import randint
 
@@ -11,6 +12,10 @@ from tqdm import tqdm
 
 from correspondence.schema import CorrespondenceBundle
 from correspondence.losses import confidence_weighted_3d_huber, projected_motion_huber
+from stage1.config import OBSERVATION_MODES, validate_observation_mode
+from stage1.objectives import masked_l1_loss
+from stage1.outputs import save_stage1_delta
+from stage1.regularizers import graph_smoothness_loss, deformation_magnitude_loss
 from arguments import ModelParams, OptimizationParams, PipelineParams
 from gaussian_renderer import render
 from scene import GaussianModel, Scene
@@ -60,32 +65,6 @@ def prepare_output(args):
         f.write(str(Namespace(**vars(args))))
 
 
-def smoothness_loss(xyz, d_xyz, k=16, sample=4096, chunk=512):
-    try:
-        n = xyz.shape[0]
-        if n <= 1:
-            return torch.zeros((), device=xyz.device)
-        count = min(sample, n)
-        sample_idx = torch.randperm(n, device=xyz.device)[:count]
-        vals = []
-        for start in range(0, count, chunk):
-            idx = sample_idx[start : start + chunk]
-            dist = torch.cdist(xyz[idx].detach(), xyz.detach())
-            nn_idx = torch.topk(dist, k=min(k + 1, n), largest=False).indices[:, 1:]
-            vals.append((d_xyz[idx, None, :] - d_xyz[nn_idx]).norm(dim=-1).mean())
-        return torch.stack(vals).mean()
-    except Exception as exc:
-        warnings.warn("Skipping smoothness loss because KNN failed: {}".format(exc))
-        return torch.zeros((), device=xyz.device)
-
-
-def masked_l1_loss(image, target, mask):
-    if mask.shape[-2:] != image.shape[-2:]:
-        mask = F.interpolate(mask[None], size=image.shape[-2:], mode="nearest")[0]
-    denom = mask.sum().clamp_min(1.0) * image.shape[0]
-    return ((image - target).abs() * mask).sum() / denom
-
-
 def load_optional_mask(path, expected_n, device="cuda"):
     if not path:
         return None
@@ -95,30 +74,10 @@ def load_optional_mask(path, expected_n, device="cuda"):
     return mask.to(device=device)
 
 
-def load_correspondence(path, expected_n, device="cuda"):
+def load_correspondence(path, expected_n, device="cuda", mode=None):
     if not path:
         return None
-    return CorrespondenceBundle.load(path, expected_n=expected_n, device=device)
-
-
-def save_effective_delta(path, gaussians, d_xyz, d_rotation, d_scaling, metadata, extra=None):
-    out_dir = os.path.dirname(path)
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
-    payload = {
-        "d_xyz": d_xyz.detach().cpu(),
-        "d_scaling": d_scaling.detach().cpu(),
-        "d_rotation": d_rotation.detach().cpu(),
-        "source_xyz": gaussians.get_xyz.detach().cpu(),
-        "metadata": metadata or {},
-    }
-    try:
-        payload["source_scaling"] = gaussians.get_scaling.detach().cpu()
-    except Exception:
-        pass
-    if extra:
-        payload.update(extra)
-    torch.save(payload, path)
+    return CorrespondenceBundle.load(path, expected_n=expected_n, device=device, mode=mode)
 
 
 def valid_target_cameras(cameras, target_root):
@@ -157,7 +116,18 @@ def training(dataset, opt, pipe, args):
     num_gaussians = gaussians.get_xyz.shape[0]
     foreground_mask = load_optional_mask(args.foreground_mask_path, num_gaussians)
     foreground_mask_f = foreground_mask.float()[:, None] if foreground_mask is not None else None
-    correspondence = load_correspondence(args.correspondence_path, num_gaussians)
+    observation_mode = validate_observation_mode(args.observation_mode)
+    style_task_metadata = {}
+    if args.style_task_path:
+        with open(args.style_task_path, "r", encoding="utf-8") as handle:
+            style_task_metadata = json.load(handle)
+    observation = None
+    if args.correspondence_path:
+        # Legacy callers omitted --observation_mode; infer that mode from the
+        # bundle while explicit non-image modes remain strict.
+        requested_mode = None if observation_mode == "image_only" else observation_mode
+        observation = load_correspondence(args.correspondence_path, num_gaussians, mode=requested_mode)
+        observation_mode = observation.observation_mode
     if args.part_labels_path:
         part_labels = torch.load(args.part_labels_path, map_location="cuda").long().flatten()
         if foreground_mask is None:
@@ -238,41 +208,53 @@ def training(dataset, opt, pipe, args):
 
         # Correspondence-guided geometry supervision complements weak image loss;
         # it is the synthetic/paired route for recovering a reproducible 3D delta.
-        if correspondence is not None:
-            target_xyz, corr_confidence = correspondence.target_xyz, correspondence.confidence
-            corr_mask = correspondence.valid_mask
-            if foreground_mask_f is not None: corr_mask = corr_mask & foreground_mask_f[:, 0].bool()
-            if args.lambda_corr_3d > 0:
+        if observation is not None:
+            corr_mask = observation.valid_3d_mask
+            corr_confidence = observation.confidence_3d
+            if observation_mode in ("oracle_3d", "hybrid") and args.lambda_corr_3d > 0:
+                if corr_mask is None:
+                    corr_mask = corr_confidence > 0 if corr_confidence is not None else torch.ones(num_gaussians, dtype=torch.bool, device="cuda")
+                if corr_confidence is None:
+                    corr_confidence = torch.ones(num_gaussians, device="cuda")
+                if foreground_mask_f is not None:
+                    corr_mask = corr_mask & foreground_mask_f[:, 0].bool()
                 predicted_xyz = gaussians.get_xyz + d_xyz
                 loss = loss + args.lambda_corr_3d * confidence_weighted_3d_huber(
-                    predicted_xyz, target_xyz, corr_confidence, corr_mask, args.corr_huber_delta_3d
+                    predicted_xyz, observation.target_xyz, corr_confidence, corr_mask, args.corr_huber_delta_3d
                 )
             if args.lambda_corr_2d > 0:
-                view_index = correspondence.view_index(viewpoint_cam.image_name)
-                observed_xy = None
-                visibility = corr_mask
-                confidence_2d = corr_confidence
-                if view_index is not None and correspondence.target_xy is not None:
-                    observed_xy = torch.as_tensor(correspondence.target_xy[view_index], device="cuda", dtype=gaussians.get_xyz.dtype)
-                    if correspondence.visibility is not None: visibility = torch.as_tensor(correspondence.visibility[view_index], device="cuda")
-                    if correspondence.confidence_2d is not None: confidence_2d = torch.as_tensor(correspondence.confidence_2d[view_index], device="cuda")
+                if observation.target_xy is None:
+                    raise ValueError("2D correspondence loss requires target_xy in the observation bundle")
+                view_index = observation.view_index(viewpoint_cam.image_name)
+                if view_index is None:
+                    raise ValueError("No target_xy entry for camera '{}'".format(viewpoint_cam.image_name))
+                observed_xy = torch.as_tensor(observation.target_xy[view_index], device="cuda", dtype=gaussians.get_xyz.dtype)
+                visibility = torch.ones(num_gaussians, dtype=torch.bool, device="cuda")
+                if observation.visibility_2d is not None:
+                    visibility = torch.as_tensor(observation.visibility_2d[view_index], device="cuda")
+                confidence_2d = torch.ones(num_gaussians, device="cuda")
+                if observation.confidence_2d is not None:
+                    confidence_2d = torch.as_tensor(observation.confidence_2d[view_index], device="cuda")
+                corr_mask_2d = visibility
+                if observation.support_count_2d is not None:
+                    corr_mask_2d = torch.as_tensor(observation.support_count_2d, device="cuda") > 0
+                if foreground_mask_f is not None:
+                    corr_mask_2d = corr_mask_2d & foreground_mask_f[:, 0].bool()
                 loss = loss + args.lambda_corr_2d * projected_motion_huber(
                     gaussians.get_xyz, d_xyz, viewpoint_cam, observed_xy, visibility,
                     confidence_2d, args.corr_huber_delta_2d,
-                    oracle_target_xyz=None if observed_xy is not None else target_xyz,
-                    valid_mask=corr_mask,
+                    oracle_target_xyz=None, valid_mask=corr_mask_2d,
                 )
 
         if foreground_mask_f is not None and foreground_mask_f.sum() > 0:
-            delta_reg = ((d_xyz ** 2).sum(dim=-1, keepdim=True) * foreground_mask_f).sum() / foreground_mask_f.sum()
-            delta_reg = delta_reg + ((d_scaling ** 2).sum(dim=-1, keepdim=True) * foreground_mask_f).sum() / foreground_mask_f.sum()
+            delta_reg = deformation_magnitude_loss(d_xyz, d_scaling, foreground_mask_f[:, 0].bool())
         else:
-            delta_reg = (d_xyz ** 2).mean() + (d_scaling ** 2).mean()
+            delta_reg = deformation_magnitude_loss(d_xyz, d_scaling)
         loss = loss + args.lambda_delta * delta_reg
         if not args.disable_d_scaling and args.scale_positive_penalty > 0:
             loss = loss + args.scale_positive_penalty * (F.relu(d_scaling) ** 2).mean()
         if args.lambda_smooth > 0:
-            loss = loss + args.lambda_smooth * smoothness_loss(
+            loss = loss + args.lambda_smooth * graph_smoothness_loss(
                 gaussians.get_xyz, d_xyz, k=args.smooth_knn, sample=args.smooth_sample
             )
 
@@ -315,22 +297,32 @@ def training(dataset, opt, pipe, args):
                 "foreground_mask_path": args.foreground_mask_path,
                 "part_labels_path": args.part_labels_path,
                 "num_parts": args.num_parts,
-                    "part_assignment_temperature": args.part_assignment_temperature,
-                    "correspondence_path": args.correspondence_path,
-                    "lambda_corr_3d": args.lambda_corr_3d,
-                    "lambda_corr_2d": args.lambda_corr_2d,
-                    "corr_huber_delta_3d": args.corr_huber_delta_3d,
-                    "corr_huber_delta_2d": args.corr_huber_delta_2d,
-                    "corr_2d_mode": "observed_target_xy" if correspondence is not None and correspondence.target_xy is not None else "oracle_projected_target_xyz",
+                "part_assignment_temperature": args.part_assignment_temperature,
+                "correspondence_path": args.correspondence_path,
+                "observation_mode": observation_mode,
+                "style_task_metadata": style_task_metadata,
+                "camera_names": observation.camera_names if observation is not None else None,
+                "view_support": observation.support_count_2d.detach().cpu().tolist() if observation is not None and observation.support_count_2d is not None else None,
+                "reprojection_residual": observation.reprojection_residual.detach().cpu().tolist() if observation is not None and observation.reprojection_residual is not None else None,
+                "lambda_corr_3d": args.lambda_corr_3d,
+                "lambda_corr_2d": args.lambda_corr_2d,
+                "corr_huber_delta_3d": args.corr_huber_delta_3d,
+                "corr_huber_delta_2d": args.corr_huber_delta_2d,
+                "corr_2d_mode": "observed_target_xy" if observation is not None and observation.target_xy is not None else "unavailable",
                 }
             latest = args.save_delta_path or os.path.join(args.model_path, "mined_delta_latest.pt")
             extra = {}
             if foreground_mask is not None:
                 extra["foreground_mask"] = foreground_mask.detach().cpu()
-            if correspondence is not None:
-                extra["correspondence_confidence"] = correspondence.confidence.detach().cpu()
-                extra["correspondence_valid_mask"] = correspondence.valid_mask.detach().cpu()
-                extra["correspondence_support_count"] = correspondence.support_count.detach().cpu()
+            if observation is not None:
+                if observation.confidence_3d is not None:
+                    extra["confidence_3d"] = observation.confidence_3d.detach().cpu()
+                if observation.valid_3d_mask is not None:
+                    extra["valid_3d_mask"] = observation.valid_3d_mask.detach().cpu()
+                if observation.confidence_2d is not None:
+                    extra["confidence_2d"] = observation.confidence_2d.detach().cpu()
+                if observation.support_count_2d is not None:
+                    extra["support_count_2d"] = observation.support_count_2d.detach().cpu()
             if isinstance(delta_model, PartDeltaModel):
                 _, _, _, part_d_xyz, part_d_scaling, part_d_rotation = delta_model.forward()
                 extra.update(
@@ -342,8 +334,8 @@ def training(dataset, opt, pipe, args):
                         "part_labels": delta_model.part_labels.detach().cpu(),
                     }
                 )
-            save_effective_delta(latest, gaussians, d_xyz, d_rotation, d_scaling, metadata, extra)
-            save_effective_delta(
+            save_stage1_delta(latest, gaussians, d_xyz, d_rotation, d_scaling, metadata, extra)
+            save_stage1_delta(
                 os.path.join(args.model_path, "mined_delta_iter_{}.pt".format(iteration)),
                 gaussians,
                 d_xyz,
@@ -362,6 +354,8 @@ if __name__ == "__main__":
     op = OptimizationParams(parser)
     pp = PipelineParams(parser)
     parser.add_argument("--target_image_root", required=True)
+    parser.add_argument("--style_task_path", default=None,
+                        help="Optional StyleTaskRecord JSON stored in delta metadata.")
     parser.add_argument("--object_id", default="big_carved_wooden_elephant_sculpture")
     parser.add_argument("--direction", default="stylized_to_standard")
     parser.add_argument("--max_d_xyz", type=float, default=0.03)
@@ -382,6 +376,8 @@ if __name__ == "__main__":
     parser.add_argument("--weak_target", nargs="?", const=True, default=True, type=str2bool)
     parser.add_argument("--composite_target_white", action="store_true")
     parser.add_argument("--foreground_loss", action="store_true")
+    parser.add_argument("--observation_mode", choices=OBSERVATION_MODES, default="image_only",
+                        help="Stage 1 supervision mode for an observation bundle.")
     parser.add_argument("--correspondence_path", default=None)
     parser.add_argument("--lambda_corr_3d", type=float, default=0.0)
     parser.add_argument("--lambda_corr_2d", type=float, default=0.0)

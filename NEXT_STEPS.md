@@ -5,20 +5,21 @@
 Do not proceed to Stage 2. No fitted translation or part-local affine delta
 currently satisfies the cosine, energy, and explained-variance acceptance gate.
 
-## Immediate Next Step: Build Correspondence
+## Immediate Next Step: Build Image Observations
 
 Do not render the old K32 candidate, increase part count, or revisit the old
 missing-azimuth issue as an active task. Those instructions are historical
 because the split-view reliability gate already failed. The active task is to
-obtain one real `G_ord_ref`, align it with sparse semantic anchors, construct
-shared-view correspondence, and fit `G_ord_canon` on the fixed `G_sty` bank.
+obtain repeated target/content image views generated from the stylized object,
+construct foreground-filtered shared-view `observed_2d` bundles, and mine free
+deltas on the fixed `G_sty` bank. A real `G_ord_ref` is optional, not a required
+main stage.
 
-Use `scripts/align_ordinary_reference.py` for an independent reference model,
-`scripts/fit_similarity_from_corresponded_points.py` for paired point sets,
-the `correspondence/` package for source-indexed confidence bundles, and
-`scripts/build_canonical_ordinary.py` plus `scripts/validate_canonical_pair.py`
-for fixed-bank export checks. No real ordinary reference has yet been processed,
-so no real target quality or canonical ordinary reliability is claimed.
+Use `correspondence/schema.py` for source-indexed confidence bundles,
+`stage1/reliability.py` for the stable-style payload contract, and the existing
+split/repeat diagnostics. The ordinary-reference utilities remain an optional
+baseline. No real target observation bundle has passed the reliability gate, so
+no real style consensus is claimed.
 
 ## Updated Stage 1.5 Result
 
@@ -46,10 +47,10 @@ The synthetic benchmark separates two problems:
    passes the provisional benchmark gate.
 
 Therefore do not tune part count or start Stage 2. The next target experiment
-must first produce one unified ordinary 3DGS, then run global similarity
-alignment, editable semantic anchors, dense multi-view matching, and a
-correspondence quality gate. Only accepted lifted target xyz/confidence data
-should be passed to the new Stage 1 correspondence losses.
+must generate repeated target image views, construct explicit observed-2D
+matches with foreground/visibility/semantic confidence, and run the
+correspondence quality gate. A unified ordinary 3D reference is optional. Only
+accepted image observations should be passed to the observed-2D Stage 1 losses.
 
 New Stage 1 options:
 

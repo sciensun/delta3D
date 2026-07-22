@@ -1,339 +1,171 @@
-# Deformable 3D Gaussians for High-Fidelity Monocular Dynamic Scene Reconstruction
+# Delta3D: Image-Supervised Geometric Style Transformation on Fixed 3D Gaussian Banks
 
-## [Project page](https://ingra14m.github.io/Deformable-Gaussians/) | [Paper](https://arxiv.org/abs/2309.13101)
+Delta3D studies source-conditioned geometric style operations on a fixed 3DGS Gaussian bank. The main route is image-first and remains 3DGS-only:
 
-![Teaser image](assets/teaser.png)
-
-This repository contains the official implementation associated with the paper "Deformable 3D Gaussians for High-Fidelity Monocular Dynamic Scene Reconstruction".
-
-
-
-## News
-
-- **[5/26/2024]** [Lightweight-Deformable-GS](https://github.com/ingra14m/Lightweight-Deformable-GS) has been integrated into this repo. For the original version aligned with paper, please check the [paper](https://github.com/ingra14m/Deformable-3D-Gaussians/tree/paper) branch.
-- **[5/24/2024]** An optimized version [Lightweight-Deformable-GS](https://github.com/ingra14m/Lightweight-Deformable-GS) has been released. It offers 50% reduced storage, 200% increased FPS, and no decrease in rendering metrics.
-- **[2/27/2024]** Deformable-GS is accepted by CVPR 2024. Our another work, [SC-GS](https://yihua7.github.io/SC-GS-web/) (with higher quality, less points and faster FPS than vanilla 3D-GS), is also accepted. See you in Seattle.
-- **[11/16/2023]** Full code and real-time viewer released.
-- **[11/4/2023]** update the computation of LPIPS in metrics.py. Previously, the `lpipsPyTorch` was unable to execute on CUDA, prompting us to switch to the `lpips` library (~20x faster).
-- **[10/25/2023]** update **real-time viewer** on project page. Many, many thanks to @[yihua7](https://github.com/yihua7) for implementing the real-time viewer adapted for Deformable-GS. Also, thanks to @[ashawkey](https://github.com/ashawkey) for releasing the original GUI.
-
-
-
-## Dataset
-
-In our paper, we use:
-
-- synthetic dataset from [D-NeRF](https://www.albertpumarola.com/research/D-NeRF/index.html).
-- real-world dataset from [NeRF-DS](https://jokeryan.github.io/projects/nerf-ds/) and [Hyper-NeRF](https://hypernerf.github.io/).
-- The dataset in the supplementary materials comes from [DeVRF](https://jia-wei-liu.github.io/DeVRF/).
-
-We organize the datasets as follows:
-
-```shell
-├── data
-│   | D-NeRF 
-│     ├── hook
-│     ├── standup 
-│     ├── ...
-│   | NeRF-DS
-│     ├── as
-│     ├── basin
-│     ├── ...
-│   | HyperNeRF
-│     ├── interp
-│     ├── misc
-│     ├── vrig
+```text
+stylized GLB
+-> canonical stylized 3DGS and source views
+-> generated target/content views preserving cameras, parts, identity, pose, and topology
+-> confident source-to-target 2D observations
+-> fixed-bank free delta
+-> view/repeat/structure reliability analysis
+-> stable style delta
+-> future source-conditioned multiscale style learning
 ```
 
-> I have identified an **inconsistency in the D-NeRF's Lego dataset**. Specifically, the scenes corresponding to the training set differ from those in the test set. This discrepancy can be verified by observing the angle of the flipped Lego shovel. To meaningfully evaluate the performance of our method on this dataset, I recommend using the **validation set of the Lego dataset** as the test set. See more in [D-NeRF dataset used in Deformable-GS](https://github.com/ingra14m/Deformable-3D-Gaussians/releases/tag/v0.1-pre-released)
+This repository does not claim real style transfer yet. Stage 2 training is paused until a reproducible stable style delta is available.
 
+Status labels used below are: **Implemented** (code exists), **Validated**
+(code or controlled benchmark passed), **Planned** (interface/design only), and
+**Historical** (recorded result that is not an active method).
 
+## Objective and Scope
 
-## Pipeline
+The primary task is: given a new object and a learned geometric style operation, apply that operation to the object's stylized 3DGS representation. The current demo direction is stylized sculpture to a less stylized/ordinary appearance. The intended operation changes geometry while preserving object identity, pose, topology, and major parts.
 
-![Teaser image](assets/pipeline.png)
+The main representation is a fixed Gaussian bank. It does not use mesh deformation, Tripo, Gaussian densification, pruning, splitting, merging, or reordering. Gaussian scaling deformation is disabled by default and background Gaussians must remain exactly fixed.
 
+## Core Insight
 
+A single optimization result is not automatically a style delta:
 
-## Run
-
-### Environment
-
-```shell
-git clone https://github.com/ingra14m/Deformable-3D-Gaussians --recursive
-cd Deformable-3D-Gaussians
-
-conda create -n deformable_gaussian_env python=3.7
-conda activate deformable_gaussian_env
-
-# install pytorch
-pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
-
-# install dependencies
-pip install -r requirements.txt
+```text
+free_delta = stable_style_component
+           + generation_randomness
+           + matching_error
+           + optimization_residual
 ```
 
+A stable style delta is the source-conditioned component reproducible across reliable views, repeated target generations, and structurally related regions, associated with a style family and intensity.
 
+## Inputs and Outputs
 
-### Train
+Inputs include a stylized GLB, a trained canonical stylized 3DGS model `G_sty`, generated target/content multi-view images, and a `style_data.StyleTaskRecord` describing object, style, intensity, repeat, cameras, prompts, and quality control.
 
-**D-NeRF:**
+Stage 1 outputs a free delta payload containing `d_xyz`, zero `d_scaling`, source xyz, foreground mask, observation mode, camera support, confidence, residual statistics, and loss metadata. Stage 1.5 produces a `StableStyleDelta` only after reliability gates pass. Future Stage 2 will output coarse, part, and detail delta components conditioned on style family and intensity.
 
-```shell
-python train.py -s path/to/your/d-nerf/dataset -m output/exp-name --eval --is_blender
+## Algorithm Stages
+
+1. **Source construction — Implemented/Validated.** Render the GLB with perspective cameras and train or load a source Graphdeco 3DGS.
+2. **Target view generation — Planned.** Generate target images from the stylized object while preserving camera, parts, identity, pose, and topology.
+3. **Image observations — Implemented as interfaces.** Store foreground-filtered 2D coordinates, visibility, confidence, camera names, and optional 3D oracle data in `ObservationBundle`.
+4. **Free delta mining — Implemented.** Optimize per-Gaussian xyz deformation through the existing renderer. Image-only, observed-2D, oracle-3D, and hybrid modes are explicit.
+5. **Reliability analysis — Implemented as tools/interfaces.** Compare view splits, repeated generations, identity controls, intensity paths, and local structure.
+6. **Stable delta — Planned.** Fuse only reliable components into `StableStyleDelta`.
+7. **Source-conditioned multiscale learning — Planned.** Learn coarse/part/detail style operations from stable deltas. No Stage 2 training is included here.
+
+## Main Image-Observation Route
+
+The primary route does not require an independently reconstructed ordinary 3D model. Target images are observations of the generated content object. Their Gaussian IDs are not assumed to correspond to source Gaussian IDs. The required intermediate artifact is a source-indexed observation bundle created from shared-view 2D matches and confidence/visibility checks.
+
+`observed_2d` bundles are valid without `target_xyz`. The schema rejects missing `target_xy` in this mode and never silently projects an oracle target. `oracle_3d` and `hybrid` are available for synthetic regression and controlled experiments.
+
+## Optional Content-3D Baseline
+
+An independently generated content 3D model may be used as an optional baseline or auxiliary reference. It is named `G_ord_ref` and has no inherent Gaussian correspondence with `G_sty`. If used, it must be aligned and matched before it can supervise a fixed-bank canonical model. It is not a required main stage.
+
+## Data and Task Schema
+
+The experimental index is:
+
+```text
+(object, style_operation, intensity, repeat, view)
 ```
 
-**NeRF-DS/HyperNeRF:**
+`StyleTaskRecord` contains object, source model, style family, source/target attributes, intensity, repeat ID, camera names, image roots, prompt, affected/preserved parts, and quality-control metadata. `ObservationBundle` contains source-indexed Gaussian geometry plus optional per-view `target_xy`, visibility, confidence, support count, reprojection residual, optional target xyz, and explicit validity masks.
 
-```shell
-python train.py -s path/to/your/real-world/dataset -m output/exp-name --eval --iterations 20000
+## Repository Architecture
+
+```text
+train.py                         upstream source 3DGS training; untouched
+train_delta_mining.py            backward-compatible Stage 1 CLI
+stage1/                          configuration, objectives, regularizers, outputs
+stage2/                          future contracts only; no model training
+style_data/                      task records and manifests
+correspondence/                  image/3D observation schema and losses
+scene/free_delta_model.py        fixed-bank free xyz delta parameters
+scene/canonical_ordinary_model.py optional fixed-bank canonical wrapper
+scripts/                         rendering, diagnostics, synthetic benchmarks
+docs/UPSTREAM_README.md           preserved upstream documentation
 ```
 
-**6DoF Transformation:**
+## Current Validation
 
-We have also implemented the 6DoF transformation of 3D-GS, which may lead to an improvement in metrics but will reduce the speed of training and inference.
+### Validated synthetic fixed-bank recovery
 
-```shell
-# D-NeRF
-python train.py -s path/to/your/d-nerf/dataset -m output/exp-name --eval --is_blender --is_6dof
+The body-roundness known-delta benchmark recovered a controlled xyz-only delta:
 
-# NeRF-DS & HyperNeRF
-python train.py -s path/to/your/real-world/dataset -m output/exp-name --eval --is_6dof --iterations 20000
+```text
+global cosine:        0.9614
+energy ratio:         0.8835
+explained variance:   0.9233
+background energy:    0
+d_scaling:            exactly zero
 ```
 
-You can also **train with the GUI:**
+This validates the fixed-bank recovery formulation when correspondence is reliable. It does not validate real generated target images.
 
-```shell
-python train_gui.py -s path/to/your/dataset -m output/exp-name --eval --is_blender
+### Historical weak-target failure
+
+Independent target-view subsets produced:
+
+```text
+weighted cosine:             0.1176
+median per-Gaussian cosine:  0.0749
+directional conflict:        46.5%
 ```
 
-- click `start` to start training, and click `stop` to stop training.
-- The GUI viewer is still under development, many buttons do not have corresponding functions currently. We plan to :
-  - [ ] reload checkpoints from the pre-trained model.
-  - [ ] Complete the functions of the other vacant buttons in the GUI.
+The old foreground-only free delta is not a stable style delta and is unusable for Stage 2. Foreground gating and zero `d_scaling` succeeded as constraints, but the style reliability gate failed.
 
+## Actual Interfaces
 
+Load a legacy synthetic oracle correspondence bundle:
 
-### Render & Evaluation
-
-```shell
-python render.py -m output/exp-name --mode render
-python metrics.py -m output/exp-name
+```bash
+python scripts/evaluate_correspondence_quality.py \
+  --correspondence_path output/elephant_source_graphdeco/synthetic_known_delta/synthetic_correspondence_body_roundness.pt \
+  --output_path /tmp/body_correspondence_quality.json
 ```
 
-We provide several modes for rendering:
+Stage 1 remains compatible with the existing entry point. Controlled observed-2D runs may use:
 
-- `render`: render all the test images
-- `time`: time interpolation tasks for D-NeRF dataset
-- `all`: time and view synthesis tasks for D-NeRF dataset
-- `view`: view synthesis tasks for D-NeRF dataset
-- `original`: time and view synthesis tasks for real-world dataset
-
-
-
-## Results
-
-### D-NeRF Dataset
-
-**Quantitative Results**
-
-<img src="assets/results/D-NeRF/Quantitative.jpg" alt="Image1" style="zoom:50%;" />
-
-**Qualitative Results**
-
- <img src="assets/results/D-NeRF/bouncing.gif" alt="Image1" style="zoom:25%;" />  <img src="assets/results/D-NeRF/hell.gif" alt="Image1" style="zoom:25%;" />  <img src="assets/results/D-NeRF/hook.gif" alt="Image3" style="zoom:25%;" />  <img src="assets/results/D-NeRF/jump.gif" alt="Image4" style="zoom:25%;" /> 
-
- <img src="assets/results/D-NeRF/lego.gif" alt="Image5" style="zoom:25%;" />  <img src="assets/results/D-NeRF/mutant.gif" alt="Image6" style="zoom:25%;" />  <img src="assets/results/D-NeRF/stand.gif" alt="Image7" style="zoom:25%;" />  <img src="assets/results/D-NeRF/trex.gif" alt="Image8" style="zoom:25%;" /> 
-
-**400x400 Resolution**
-
-|          | PSNR  | SSIM   | LPIPS (VGG) | FPS  | Mem   | Num. (k) |
-| -------- | ----- | ------ | ----------- | ---- | ----- | -------- |
-| bouncing | 41.46 | 0.9958 | 0.0046      | 112  | 13.16 | 55622    |
-| hell     | 42.11 | 0.9885 | 0.0153      | 375  | 3.72  | 15733    |
-| hook     | 37.77 | 0.9897 | 0.0103      | 128  | 11.74 | 49613    |
-| jump     | 39.10 | 0.9930 | 0.0090      | 217  | 6.81  | 28808    |
-| mutant   | 43.73 | 0.9969 | 0.0029      | 124  | 11.45 | 48423    |
-| standup  | 45.38 | 0.9967 | 0.0032      | 210  | 5.94  | 25102    |
-| trex     | 38.40 | 0.9959 | 0.0041      | 85   | 18.6  | 78624    |
-| Average  | 41.14 | 0.9938 | 0.0070      | 179  | 10.20 | 43132    |
-
-### NeRF-DS Dataset
-
-<img src="assets/results/NeRF-DS/Quantitative.jpg" alt="Image1" style="zoom:50%;" />
-
-See more visualization on our [project page](https://ingra14m.github.io/Deformable-Gaussians/).
-
-
-
-### HyperNeRF Dataset
-
-Since the **camera pose** in HyperNeRF is less precise compared to NeRF-DS, we use HyperNeRF as a reference for partial visualization and the display of Failure Cases, but do not include it in the calculation of quantitative metrics. The results of the HyperNeRF dataset can be viewed on the [project page](https://ingra14m.github.io/Deformable-Gaussians/).
-
-
-
-### Real-Time Viewer
-
-https://github.com/ingra14m/Deformable-3D-Gaussians/assets/63096187/ec26d0b9-c126-4e23-b773-dcedcf386f36
-
-
-
-## Acknowledgments
-
-We sincerely thank the authors of [3D-GS](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/), [D-NeRF](https://www.albertpumarola.com/research/D-NeRF/index.html), [HyperNeRF](https://hypernerf.github.io/), [NeRF-DS](https://jokeryan.github.io/projects/nerf-ds/), and [DeVRF](https://jia-wei-liu.github.io/DeVRF/), whose codes and datasets were used in our work. We thank [Zihao Wang](https://github.com/Alen-Wong) for the debugging in the early stage, preventing this work from sinking. We also thank the reviewers and AC for not being influenced by PR, and fairly evaluating our work. This work was mainly supported by ByteDance MMLab.
-
-
-
-
-## BibTex
-
+```bash
+python train_delta_mining.py \
+  -s path/to/source_dataset \
+  --model_path output/source_model \
+  --target_image_root path/to/target_views \
+  --correspondence_path path/to/observation_bundle.pt \
+  --observation_mode observed_2d \
+  --lambda_corr_2d 1.0 \
+  --max_d_scaling 0.0 \
+  --disable_d_scaling
 ```
+
+Use `oracle_3d` only for controlled known-delta tests. Do not use it to claim real image-only correspondence.
+
+## Acceptance Gates
+
+Do not promote a free delta to a stable style delta unless the source render remains sharp, background deformation energy is zero, `d_scaling` is exactly zero, independent view consistency is strong or improving, repeated target generations agree directionally, structurally related regions show compatible motion, identity-control deltas remain near zero, intensity paths are interpretable, and low-confidence/unmatched regions are not forced into a teacher.
+
+Do not start Stage 2 before the stable-style gate passes.
+
+## Roadmap
+
+1. Prepare repeated target generations with strict camera and topology controls.
+2. Build real `observed_2d` bundles with foreground, mutual-match, semantic, visibility, and confidence filtering.
+3. Run view/repeat/identity/intensity reliability analysis.
+4. Save a `StableStyleDelta` only if the gate passes.
+5. Design and train source-conditioned multiscale style learning.
+
+## Upstream Attribution
+
+The original renderer and source dynamic reconstruction code are from [Deformable 3D Gaussians](https://github.com/ingra14m/Deformable-3D-Gaussians), implementing Yang et al. See `docs/UPSTREAM_README.md` for preserved upstream usage, datasets, results, and attribution.
+
+```bibtex
 @article{yang2023deformable3dgs,
-    title={Deformable 3D Gaussians for High-Fidelity Monocular Dynamic Scene Reconstruction},
-    author={Yang, Ziyi and Gao, Xinyu and Zhou, Wen and Jiao, Shaohui and Zhang, Yuqing and Jin, Xiaogang},
-    journal={arXiv preprint arXiv:2309.13101},
-    year={2023}
+  title={Deformable 3D Gaussians for High-Fidelity Monocular Dynamic Scene Reconstruction},
+  author={Yang, Ziyi and Gao, Xinyu and Zhou, Wen and Jiao, Shaohui and Zhang, Yuqing and Jin, Xiaogang},
+  journal={arXiv preprint arXiv:2309.13101},
+  year={2023}
 }
 ```
-
-And thanks to the authors of [3D Gaussians](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/) for their excellent code, please consider also cite this repository:
-
-```
-@Article{kerbl3Dgaussians,
-      author       = {Kerbl, Bernhard and Kopanas, Georgios and Leimk{\"u}hler, Thomas and Drettakis, George},
-      title        = {3D Gaussian Splatting for Real-Time Radiance Field Rendering},
-      journal      = {ACM Transactions on Graphics},
-      number       = {4},
-      volume       = {42},
-      month        = {July},
-      year         = {2023},
-      url          = {https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/}
-}
-```
-
-## Stylized Animal Model Labeling Tools
-
-This repository also includes small helper scripts for organizing preview images and generating candidate labels for stylized 3D animal deformation research. The labels are not final decisions; they are intended for manual correction.
-
-Expected inputs:
-
-```bash
-previews/      # one preview image per model
-models.xlsx    # model names plus GLB or Sketchfab URLs
-```
-
-Basic workflow:
-
-```bash
-mkdir -p previews
-# Put one preview image per model in previews/
-# Put the spreadsheet in the project root as models.xlsx
-
-bash run_label_pipeline.sh
-```
-
-The single-entry script runs the three steps below:
-
-```bash
-python build_manifest.py --image_dir previews --excel models.xlsx --out outputs/manifest.csv --match_mode order
-
-python auto_tag_images.py --manifest outputs/manifest.csv --vocab outputs/deformation_vocab.yaml --out outputs/labels_auto.xlsx --jsonl outputs/labels.jsonl
-
-python make_contact_sheet.py --manifest outputs/manifest.csv --labels outputs/labels_auto.xlsx --out outputs/contact_sheet.png
-```
-
-The auto-tagging step also writes `outputs/labels_for_manual.xlsx`, which is the editable manual review copy.
-
-Pipeline inputs you need to prepare:
-
-- `previews/`: put preview images here, one image per model.
-- `models.xlsx`: put this Excel file in the project root. It should contain model names and GLB or Sketchfab URLs.
-- Matching defaults to row order. To match by filename stem, run `MATCH_MODE=stem bash run_label_pipeline.sh`.
-- Existing outputs are protected. To regenerate them, run `OVERWRITE=true bash run_label_pipeline.sh`.
-- Custom paths are supported, for example `IMAGE_DIR=thumbs_300 EXCEL=my_models.xlsx OUT_DIR=outputs bash run_label_pipeline.sh`.
-
-Optional GLB utilities:
-
-```bash
-python download_glbs.py --manifest outputs/manifest.csv --out_dir glbs
-python extract_glb_features.py --manifest outputs/manifest.csv --glb_dir glbs --out outputs/geometry_features.csv
-```
-
-All generated files are protected by default. Pass `--overwrite` to replace an existing output file.
-
-## Dataset Downloader
-
-Use this pipeline when you have an Excel file of model links and want to build a local download folder. The downloader is conservative: it does not bypass paywalls, login restrictions, captcha, DRM, or website access controls. If a page requires login, purchase, manual confirmation, captcha, or lacks download permission, the row is recorded as `manual_required` or skipped.
-
-Inputs you prepare:
-
-- Put the spreadsheet in the project root as `models.xlsx`, or pass `--excel /path/to/file.xlsx`.
-- The spreadsheet may contain columns such as `model_id`, `name`, `title`, `url`, `sketchfab_url`, `fab_url`, `glb_url`, `download_url`, and `notes`.
-- Direct `.glb`, `.gltf`, `.zip`, `.obj`, and `.fbx` URLs are downloaded with `requests`.
-- Sketchfab/Fab/webpage links are opened with Playwright and only normal visible webpage download controls are used.
-
-Step 1: test the first 3 rows in the current terminal. This runs headless, which works on servers without an XServer:
-
-```bash
-/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --limit 3 --use_persistent_browser --debug
-```
-
-Step 2: run all rows:
-
-```bash
-/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --use_persistent_browser --debug
-```
-
-Use `--headful` only from a terminal with a graphical desktop/XServer, for example when you need to log in manually once and keep cookies in `.browser_profile`:
-
-```bash
-/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --limit 3 --headful --use_persistent_browser --debug
-```
-
-From Windows SSH, start an XServer such as VcXsrv/Xming/MobaXterm, connect with X11 forwarding, log in once, then run the downloader:
-
-```bash
-ssh -Y user@server
-cd /home/shichang/Deformable-3D-Gaussians
-/usr/bin/python browser_login.py --url https://sketchfab.com/login --browser_profile .browser_profile
-/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --limit 3 --headful --use_persistent_browser --debug --overwrite
-```
-
-After the login cookies are saved, later runs can usually be headless:
-
-```bash
-/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --use_persistent_browser --debug --overwrite
-```
-
-If Google/Epic/Apple login refuses the Playwright browser, use a Sketchfab API token instead. Get the token in your normal Windows browser from your Sketchfab account/developer settings, then pass it to the server:
-
-```bash
-cd /home/shichang/Deformable-3D-Gaussians
-export SKETCHFAB_API_TOKEN="paste_your_token_here"
-
-/usr/bin/python download_dataset.py --excel models.xlsx --out_dir downloads --limit 3 --debug --overwrite
-```
-
-With `SKETCHFAB_API_TOKEN` set, Sketchfab rows are attempted through the official download API first. Rows without download permission are still recorded as `manual_required`; the script does not bypass account, license, purchase, or permission restrictions.
-
-Step 3: inspect downloaded files:
-
-```bash
-/usr/bin/python inspect_downloads.py --downloads downloads --out outputs/download_manifest.csv
-```
-
-Step 4: optionally generate previews:
-
-```bash
-/usr/bin/python extract_glb_preview.py --manifest outputs/download_manifest.csv --out_dir previews_from_glb --size 300
-```
-
-Downloader outputs:
-
-- `downloads/`: one folder per model, containing `source.glb`, `source.zip`, `extracted/`, `metadata.json`, and related files when available.
-- `outputs/download_status.csv`: row-by-row download status.
-- `outputs/download_log.txt`: readable log.
-- `outputs/manual_required.csv`: rows that need manual action.
-- `outputs/debug_screenshots/`: screenshots and HTML snapshots for failed/debug rows.
-
-Repeated runs skip existing downloaded files unless `--overwrite` is passed.

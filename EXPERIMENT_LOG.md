@@ -264,3 +264,33 @@ The earlier GPU synthetic correspondence recovery remains the latest recovery
 metric: cosine `0.9614`, energy ratio `0.8835`, explained variance `0.9233`.
 The refactor has not claimed a new GPU recovery run. Stage 2 and part
 compression remain paused.
+
+## Image-first Research Correction
+
+The main route is now explicitly:
+
+```text
+stylized GLB
+-> canonical stylized 3DGS and source views
+-> generated target/content multi-view images
+-> source-indexed observed-2D bundle
+-> fixed-bank free delta
+-> view/repeat/identity/intensity/structure reliability
+-> stable style delta
+-> future source-conditioned multiscale learning
+```
+
+An independently generated ordinary/content 3D model is optional and remains a
+baseline/reference only. It is not required and does not provide inherent
+Gaussian correspondence.
+
+Added `style_data.StyleTaskRecord` for the experimental index
+`(object, style_operation, intensity, repeat, view)`. Added the image-first
+`ObservationBundle` schema with explicit `observed_2d`, `oracle_3d`, and
+`hybrid` modes. `observed_2d` validates without `target_xyz` and refuses to
+silently project oracle geometry. Legacy `CorrespondenceBundle` imports and old
+synthetic files remain loadable.
+
+Stage 1 now records observation mode and separates image/2D/3D responsibilities
+through the `stage1/` modules. Added `StableStyleDelta` and future Stage 2
+contracts only; no Stage 2 model or training was run.

@@ -1,6 +1,8 @@
 # Project Method
 
-This repository implements a 3DGS-only two-stage deformation pipeline.
+This repository implements an image-supervised, 3DGS-only style deformation
+pipeline. The main target route is generated multi-view images, not an
+independently reconstructed ordinary 3D model.
 
 ## Objective
 
@@ -10,10 +12,10 @@ The canonical source is a stylized Graphdeco 3DGS Gaussian bank:
 G_sty -> Delta* -> B(F, z)
 ```
 
-Stage 1 mines a pseudo deformation from correspondence-filtered ordinary
-reference observations. Weak manually generated target images are observations,
-not paired Gaussian ground truth. Stage 2 is intentionally paused until Stage 1
-produces a structured, reproducible Delta*.
+Stage 1 mines a free deformation from source-to-target image observations.
+Weak generated images are observations, not paired Gaussian ground truth.
+Stage 1.5 tests view, repeat, identity, intensity, and structural reliability.
+Stage 2 is intentionally paused until a stable, reproducible style Delta* exists.
 
 ## Current Source
 
@@ -29,15 +31,18 @@ The source builder is not retrained in the current experiment.
 ## Fixed-bank terminology
 
 - `G_sty`: the canonical stylized source 3DGS loaded by delta3D.
-- `G_ord_ref`: an independently generated ordinary reference model. It may have
-  different Gaussian count, indexing, and distribution, so its Gaussian IDs
-  must never be treated as paired with `G_sty`.
+- `G_ord_ref`: an optional independently generated ordinary/content 3D reference.
+  It may have different Gaussian count, indexing, and distribution, so its
+  Gaussian IDs must never be treated as paired with `G_sty`. It is not required
+  by the main image-observation route.
 - `G_ord_canon`: the ordinary model fitted on the unchanged `G_sty` bank:
   `G_ord_canon = T(G_sty, Delta*)`. It preserves Gaussian count, IDs, source
   foreground/background identity, source KNN graph, and source part identity.
 
-The actual paired training object is `(G_sty, G_ord_canon, Delta*)`.
-`G_ord_ref` is only the teacher used to construct correspondence and confidence.
+The main supervision object is `(G_sty, image observations, Delta*)`.
+If the optional reference route is used, `G_ord_ref` is only an auxiliary
+reference used to construct observations and confidence; `G_ord_canon` is still
+fitted on the fixed `G_sty` bank.
 
 ## Stage 1
 
@@ -100,36 +105,35 @@ train-only subset. Independent subset mining then produced weighted cosine
 This is a weak/unreliable teacher signal. Consensus and Stage 2 remain paused;
 the next research change must improve target geometric correspondence.
 
-## Corrected Paired-Supervision Pipeline
+## Main Image-Observation Pipeline
 
 An independently generated ordinary object is not a geometric pair merely
 because it shares an object category or a requested camera view. The intended
 pipeline is:
 
 ```text
-stylized 3DGS
--> unified ordinary 3D representation
--> global similarity alignment
--> semantic anchors
--> dense multi-view correspondence
--> confidence-filtered paired data
--> Stage 1 Delta*
--> split-view reliability gate
--> structured compression
--> Stage 2
+stylized GLB
+-> canonical stylized 3DGS and source views
+-> generated target/content multi-view images
+-> foreground/mutual/semantic/visibility-filtered 2D observations
+-> fixed-bank free Delta
+-> view/repeat/structure reliability
+-> stable style Delta*
+-> future source-conditioned multiscale learning
 ```
 
-Global alignment removes coordinate-system differences only; it must not
-non-rigidly warp away the intended stylized-to-ordinary deformation. The new
-Stage 1 correspondence interface accepts lifted target xyz positions and
-confidence, adds projected 2D-motion and 3D Huber losses, and keeps foreground
-gating, exact-zero background motion, and exact-zero Gaussian scaling.
+The image-first schema accepts observed 2D target positions without target xyz.
+Oracle 3D and hybrid modes exist only for controlled synthetic tests. Stage 1
+adds projected 2D-motion loss when observed coordinates are present, keeps
+optional 3D loss explicit, and records whether oracle 3D was available.
+Optional alignment of `G_ord_ref` removes coordinate differences only; it must
+not non-rigidly erase the intended style change.
 
-The correspondence hierarchy is explicit: similarity alignment, semantic
-anchors, shared-view 2D matches, depth lifting, robust multi-view fusion, and
-fixed-bank canonical fitting. Unmatched or low-confidence Gaussians remain
-unpaired and are handled by confidence weighting and graph regularization; they
-are not forced to have a target position.
+The correspondence hierarchy is explicit for optional reference experiments:
+semantic anchors, shared-view 2D matches, visibility checks, and confidence
+fusion. Unmatched or low-confidence Gaussians remain unpaired and are handled by
+confidence weighting and graph regularization; they are not forced to have a
+target position.
 
 This method currently assumes topology-preserving continuous geometry changes.
 New or removed parts and major topology changes are out of scope. Once the
@@ -147,5 +151,19 @@ output/elephant_source_graphdeco/synthetic_known_delta/
 
 The body-roundness benchmark shows that image-only LPIPS/RGB optimization is
 insufficient even with perfectly rendered targets, while direct correspondence
-loss recovers the known geometry. No ordinary generated target has yet passed
-the real correspondence quality gate, so Stage 2 remains disabled.
+loss recovers the known geometry. No real target-image observation bundle has
+yet passed the reliability gate, so stable style consensus and Stage 2 remain
+disabled.
+
+## Reliability Definition
+
+For each `(object, style_operation, intensity, repeat, view)` task:
+
+```text
+free_delta = stable_style_delta + residual
+```
+
+The stable component must be reproducible across views and repeated target
+generations, structurally coherent, and associated with a style operation and
+intensity. Topology-preserving continuous changes are in scope. Major topology
+changes, newly added parts, and removed parts are out of scope.
