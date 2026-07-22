@@ -265,6 +265,49 @@ metric: cosine `0.9614`, energy ratio `0.8835`, explained variance `0.9233`.
 The refactor has not claimed a new GPU recovery run. Stage 2 and part
 compression remain paused.
 
+## Observed-2D Fixed-Bank Acceptance Experiment
+
+Run date: 2026-07-22. The body-roundness synthetic teacher was projected with
+the exact source cameras. Hidden `target_xyz` was used only to generate those
+projections and to evaluate the recovered delta after training. Every optimizer
+bundle used `observation_mode=observed_2d`, `target_xyz=None`, and contained
+`target_xy [V,N,2]`, visibility, confidence, support counts, and camera names.
+
+The deterministic seed was `20260722`. All runs used xyz-only deformation,
+`max_d_xyz=0.08`, exact-zero scaling, `lambda_corr_2d=1`, no RGB/LPIPS/image
+loss, `lambda_delta=0.0005`, `lambda_smooth=0.005`, 800 iterations, and fixed
+Gaussian count/order. Conditions were clean 1/2/4/8 views, 0.5 px and 2 px
+noise, 5% and 10% outliers, 70% visibility, and alternating A/B four-view
+splits.
+
+| condition | global cosine | active cosine | energy | explained variance | held-out projection |
+|---|---:|---:|---:|---:|---:|
+| clean 1 | 0.7512 | 0.7512 | 1.4349 | 0.3602 | 2.7492 px / 7 |
+| clean 2 | 1.0000 | 1.0000 | 0.9999 | 0.9999 | 0.0267 px / 6 |
+| clean 4 | 1.0000 | 1.0000 | 0.9950 | 1.0000 | 0.0094 px / 4 |
+| clean 8 | 1.0000 | 1.0000 | 0.9997 | 1.0000 | 0.0013 px / 216 |
+| noise 0.5 px | 0.9988 | 0.9995 | 1.0021 | 0.9975 | n/a |
+| noise 2 px | 0.9770 | 0.9907 | 1.0221 | 0.9531 | n/a |
+| outliers 5% | 0.9975 | 0.9979 | 0.9803 | 0.9949 | n/a |
+| outliers 10% | 0.9909 | 0.9923 | 0.9540 | 0.9816 | n/a |
+| visibility 70% | 0.9981 | 0.9981 | 0.9714 | 0.9959 | n/a |
+
+All runs had zero background energy and exact-zero `d_scaling`. A/B full
+foreground weighted cosine was `0.99998`, median per-Gaussian cosine `0.6962`,
+and conflict `29.7%`. On the known active body-roundness region, weighted and
+median cosine were `1.0` with zero conflict. The full-foreground statistic is
+reported because it includes inactive near-zero entries rather than hiding
+them.
+
+The clean-8 visual panel is
+`output/elephant_source_graphdeco/synthetic_observed_2d_benchmark/clean_8/novel_render_panels/0001_elevm020_az005_source_known_recovered.png`.
+Source, known, and recovered renders are clear and coherent. Shared floating
+background noise appears in all columns and is a source-model artifact.
+
+**Decision: synthetic observed-2D gate PASS.** This validates recovery from
+consistent 2D observations, not real generated style targets. Real target
+generation, repeats, and Stage 2 remain unrun.
+
 ## Image-first Research Correction
 
 The main route is now explicitly:

@@ -2,16 +2,17 @@
 
 ## Current Decision
 
-Do not proceed to Stage 2. No fitted translation or part-local affine delta
-currently satisfies the cosine, energy, and explained-variance acceptance gate.
+Do not proceed to Stage 2. The controlled synthetic observed-2D acceptance
+experiment passes, but no real target-generation package has produced a
+reproducible stable style delta.
 
-## Immediate Next Step: Build Image Observations
+## Immediate Next Step: Real Repeated Image-Observation Pilot
 
-Do not render the old K32 candidate, increase part count, or revisit the old
-missing-azimuth issue as an active task. Those instructions are historical
-because the split-view reliability gate already failed. The active task is to
-obtain repeated target/content image views generated from the stylized object,
-construct foreground-filtered shared-view `observed_2d` bundles, and mine free
+The synthetic observed-2D gate is now passed. The first real pilot is one
+object, one style family, one intensity, and three complete multi-view target
+generation repeats. Obtain target images from the stylized object with strict
+camera, identity, pose, and topology preservation; construct
+foreground-filtered shared-view `observed_2d` bundles; and mine xyz-only free
 deltas on the fixed `G_sty` bank. A real `G_ord_ref` is optional, not a required
 main stage.
 
@@ -20,6 +21,11 @@ Use `correspondence/schema.py` for source-indexed confidence bundles,
 split/repeat diagnostics. The ordinary-reference utilities remain an optional
 baseline. No real target observation bundle has passed the reliability gate, so
 no real style consensus is claimed.
+
+The synthetic acceptance artifact is
+`output/elephant_source_graphdeco/synthetic_observed_2d_benchmark/benchmark_summary.json`.
+It validates the fixed-bank optimizer and observation loss, not target-image
+quality.
 
 ## Updated Stage 1.5 Result
 

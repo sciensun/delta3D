@@ -2,9 +2,10 @@
 
 ## Status
 
-**PARTIAL**. The architecture and schemas are refactored and CPU-validated.
-Real generated target-image observations have not yet passed the reliability
-gate, so there is no real stable style delta and Stage 2 remains paused.
+**PARTIAL / SYNTHETIC OBSERVED-2D PASS**. The image-only fixed-bank acceptance
+experiment passes on the controlled body-roundness benchmark. No real
+generated target-image observations have passed the reliability gate, so there
+is no real stable style delta and Stage 2 remains paused.
 
 ## Objective
 
@@ -46,6 +47,16 @@ zero `d_scaling`, and synthetic canonical export/PLY reload where available.
 The existing synthetic GPU benchmark remains the latest validated recovery:
 cosine `0.9614`, energy ratio `0.8835`, explained variance `0.9233`, background
 energy `0`, and `d_scaling=0`.
+
+The clean-8 observed-2D-only run reached global cosine `0.9999997`, active
+cosine `1.0`, energy ratio `0.9997`, explained variance `0.9999995`, zero
+background energy, exact-zero scaling, and `0.0013 px` novel-view projection
+RMSE over 216 cameras. The 1/2/4/8-view cosine trend was
+`0.7512/0.99997/1.0/1.0`. Eight-view robustness remained strong at global
+cosine `0.9988` for 0.5 px noise, `0.9770` for 2 px noise, `0.9975/0.9909`
+for 5%/10% outliers, and `0.9981` with 70% visibility. A/B active-region
+cosine was `1.0`; full-foreground weighted cosine was `0.99998` with 29.7%
+conflict from inactive near-zero entries.
 
 The historical weak-target split result remains failed: weighted cosine
 `0.1176`, median per-Gaussian cosine `0.0749`, and directional conflict
@@ -90,5 +101,5 @@ reliability analysis before promoting any delta.
 
 ## Git
 
-Commit SHA: `f6a4240d8b5cfea0a5979b25223f24f44a9bbca2`.
+Commit SHA: `4379734df3980bc4d04cf8678bc1b6ebd1fa4ad3`.
 Push status: pushed to `delta3D/main`.

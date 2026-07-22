@@ -117,6 +117,37 @@ directional conflict:        46.5%
 
 The old foreground-only free delta is not a stable style delta and is unusable for Stage 2. Foreground gating and zero `d_scaling` succeeded as constraints, but the style reliability gate failed.
 
+### Validated observed-2D acceptance experiment
+
+The controlled body-roundness benchmark also has an image-observation-only
+run. The builder creates exact camera projections from the hidden synthetic
+teacher, but the optimizer bundle contains only `target_xy`, visibility, and
+confidence; `target_xyz` is not available to optimization and is used only by
+the post-training evaluator.
+
+```bash
+python scripts/run_observed_2d_benchmark.py \
+  --model_path output/elephant_source_graphdeco \
+  --source_path assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset \
+  --gt_delta_path output/elephant_source_graphdeco/synthetic_known_delta/synthetic_delta_body_roundness.pt \
+  --output_dir output/elephant_source_graphdeco/synthetic_observed_2d_benchmark
+```
+
+**Validated:** clean 8-view recovery reached global cosine `0.9999997`, active
+region cosine `1.0`, explained variance `0.9999995`, energy ratio `0.9997`,
+zero background energy, and exact-zero `d_scaling`. The A/B split had active
+region cosine `1.0`; full-foreground weighted cosine was `0.99998` with 29.7%
+conflict from inactive/near-zero entries. Novel-view projection RMSE was
+`0.0013 px` over 216 cameras. These are controlled synthetic results, not a
+claim of real style transfer.
+
+The clean view trend was one/two/four/eight views: cosine `0.7512/0.99997/
+1.0/1.0`, with one-view explained variance `0.3602` and 2.75 px held-out
+projection error. Eight-view robustness remained strong at global cosine
+`0.9988` for 0.5 px noise, `0.9770` for 2 px noise, `0.9975/0.9909` for 5%/10%
+outliers, and `0.9981` with 70% visibility. Stage 2 remains **Planned** and
+paused until real target repeats pass reliability gates.
+
 ## Actual Interfaces
 
 Load a legacy synthetic oracle correspondence bundle:
