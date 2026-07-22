@@ -1,0 +1,164 @@
+[
+  {
+    "object_id": "big_carved_wooden_elephant_sculpture",
+    "object_category": "wooden elephant sculpture",
+    "source_glb": "assets/3D/big_carved_wooden_elephant_sculpture.glb",
+    "source_3dgs": "output/elephant_source_graphdeco",
+    "style_family": "blocky_to_rounded",
+    "source_attributes": {
+      "blockiness": "high",
+      "faceting": "high"
+    },
+    "target_attributes": {
+      "blockiness": "moderately reduced",
+      "roundness": "increased"
+    },
+    "intensity": 0.5,
+    "repeat_id": "repeat_0",
+    "camera_names": [
+      "0072_elev000_az000.png",
+      "0081_elev000_az045.png",
+      "0090_elev000_az090.png",
+      "0099_elev000_az135.png",
+      "0108_elev000_az180.png",
+      "0117_elev000_az225.png",
+      "0126_elev000_az270.png",
+      "0135_elev000_az315.png"
+    ],
+    "source_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset/images",
+    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/repeat_0/targets_key8",
+    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into a moderately rounded, less blocky version.\n\nPreserve the exact same camera viewpoint, crop, object identity, pose, trunk direction, ear placement, leg placement, body placement, base attachment, topology, and number of parts. Keep the same material, color, lighting, and background as far as possible. Reduce blockiness and faceting moderately and make the volumes smoother, more rounded, and anatomically coherent. Do not add or delete parts, change posture, change the camera, redesign the texture, or introduce unrelated realism changes. Output one centered object only with the same framing and no text or extra objects.\n",
+    "affected_parts": [
+      "body surface",
+      "body volume"
+    ],
+    "preserved_parts": [
+      "head",
+      "trunk",
+      "ears",
+      "legs",
+      "base",
+      "pose",
+      "camera",
+      "topology"
+    ],
+    "quality_control": {
+      "required_complete_views": 8,
+      "requires_manual_silhouette_check": true,
+      "requires_identity_check": true,
+      "repeat_is_independent": true
+    },
+    "metadata": {
+      "generation_status": "not_generated",
+      "observation_status": "not_extracted"
+    }
+  },
+  {
+    "object_id": "big_carved_wooden_elephant_sculpture",
+    "object_category": "wooden elephant sculpture",
+    "source_glb": "assets/3D/big_carved_wooden_elephant_sculpture.glb",
+    "source_3dgs": "output/elephant_source_graphdeco",
+    "style_family": "blocky_to_rounded",
+    "source_attributes": {
+      "blockiness": "high",
+      "faceting": "high"
+    },
+    "target_attributes": {
+      "blockiness": "moderately reduced",
+      "roundness": "increased"
+    },
+    "intensity": 0.5,
+    "repeat_id": "repeat_1",
+    "camera_names": [
+      "0072_elev000_az000.png",
+      "0081_elev000_az045.png",
+      "0090_elev000_az090.png",
+      "0099_elev000_az135.png",
+      "0108_elev000_az180.png",
+      "0117_elev000_az225.png",
+      "0126_elev000_az270.png",
+      "0135_elev000_az315.png"
+    ],
+    "source_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset/images",
+    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/repeat_1/targets_key8",
+    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into a moderately rounded, less blocky version.\n\nPreserve the exact same camera viewpoint, crop, object identity, pose, trunk direction, ear placement, leg placement, body placement, base attachment, topology, and number of parts. Keep the same material, color, lighting, and background as far as possible. Reduce blockiness and faceting moderately and make the volumes smoother, more rounded, and anatomically coherent. Do not add or delete parts, change posture, change the camera, redesign the texture, or introduce unrelated realism changes. Output one centered object only with the same framing and no text or extra objects.\n",
+    "affected_parts": [
+      "body surface",
+      "body volume"
+    ],
+    "preserved_parts": [
+      "head",
+      "trunk",
+      "ears",
+      "legs",
+      "base",
+      "pose",
+      "camera",
+      "topology"
+    ],
+    "quality_control": {
+      "required_complete_views": 8,
+      "requires_manual_silhouette_check": true,
+      "requires_identity_check": true,
+      "repeat_is_independent": true
+    },
+    "metadata": {
+      "generation_status": "not_generated",
+      "observation_status": "not_extracted"
+    }
+  },
+  {
+    "object_id": "big_carved_wooden_elephant_sculpture",
+    "object_category": "wooden elephant sculpture",
+    "source_glb": "assets/3D/big_carved_wooden_elephant_sculpture.glb",
+    "source_3dgs": "output/elephant_source_graphdeco",
+    "style_family": "blocky_to_rounded",
+    "source_attributes": {
+      "blockiness": "high",
+      "faceting": "high"
+    },
+    "target_attributes": {
+      "blockiness": "moderately reduced",
+      "roundness": "increased"
+    },
+    "intensity": 0.5,
+    "repeat_id": "repeat_2",
+    "camera_names": [
+      "0072_elev000_az000.png",
+      "0081_elev000_az045.png",
+      "0090_elev000_az090.png",
+      "0099_elev000_az135.png",
+      "0108_elev000_az180.png",
+      "0117_elev000_az225.png",
+      "0126_elev000_az270.png",
+      "0135_elev000_az315.png"
+    ],
+    "source_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset/images",
+    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/repeat_2/targets_key8",
+    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into a moderately rounded, less blocky version.\n\nPreserve the exact same camera viewpoint, crop, object identity, pose, trunk direction, ear placement, leg placement, body placement, base attachment, topology, and number of parts. Keep the same material, color, lighting, and background as far as possible. Reduce blockiness and faceting moderately and make the volumes smoother, more rounded, and anatomically coherent. Do not add or delete parts, change posture, change the camera, redesign the texture, or introduce unrelated realism changes. Output one centered object only with the same framing and no text or extra objects.\n",
+    "affected_parts": [
+      "body surface",
+      "body volume"
+    ],
+    "preserved_parts": [
+      "head",
+      "trunk",
+      "ears",
+      "legs",
+      "base",
+      "pose",
+      "camera",
+      "topology"
+    ],
+    "quality_control": {
+      "required_complete_views": 8,
+      "requires_manual_silhouette_check": true,
+      "requires_identity_check": true,
+      "repeat_is_independent": true
+    },
+    "metadata": {
+      "generation_status": "not_generated",
+      "observation_status": "not_extracted"
+    }
+  }
+]

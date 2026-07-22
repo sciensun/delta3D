@@ -1,0 +1,3 @@
+Convert this rendered stylized wooden elephant sculpture into a moderately rounded, less blocky version.
+
+Preserve the exact same camera viewpoint, crop, object identity, pose, trunk direction, ear placement, leg placement, body placement, base attachment, topology, and number of parts. Keep the same material, color, lighting, and background as far as possible. Reduce blockiness and faceting moderately and make the volumes smoother, more rounded, and anatomically coherent. Do not add or delete parts, change posture, change the camera, redesign the texture, or introduce unrelated realism changes. Output one centered object only with the same framing and no text or extra objects.

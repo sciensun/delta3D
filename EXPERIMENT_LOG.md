@@ -337,3 +337,38 @@ synthetic files remain loadable.
 Stage 1 now records observation mode and separates image/2D/3D responsibilities
 through the `stage1/` modules. Added `StableStyleDelta` and future Stage 2
 contracts only; no Stage 2 model or training was run.
+
+## Image-Derived Observation Experiment
+
+Run date: 2026-07-22. Added a pluggable matcher interface with an OpenCV
+Farneback baseline, foreground/mask filtering, local projected-footprint median
+flow, forward/backward cycle confidence, target foreground checks, and a coarse
+projected depth-bin visibility estimate. Bundle metadata records
+`matcher=opencv_farneback`, `visibility_method=projected_foreground_coarse_zbuffer`,
+and `target_xyz_in_optimizer_input=false`. The matcher reads only images, masks,
+source xyz/cameras, and source visibility; every optimizer bundle has
+`target_xyz=None`.
+
+| teacher/condition | median EPE | PCK@5 | PCK@10 | visible coverage |
+|---|---:|---:|---:|---:|
+| body clean 8 | 3.691 px | 0.539 | 0.719 | 0.356 |
+| body brightness/contrast | 3.964 px | 0.529 | 0.711 | 0.358 |
+| body blur/noise | 2.795 px | 0.567 | 0.738 | 0.366 |
+| body eroded mask | 3.582 px | 0.543 | 0.724 | 0.352 |
+| ear clean 8 | 0.060 px | 0.822 | 0.839 | 0.344 |
+| trunk clean 8 | 0.109 px | 0.801 | 0.889 | 0.333 |
+
+Body fails the provisional observation gate (`median EPE <=3`, `PCK@5 >=.80`,
+coverage `>=.40`). Ear and trunk pass PCK@5 but fail coverage and have long
+error tails. Body split observations were extracted: A median EPE `1.694 px`,
+PCK@5 `.588`, coverage `.242`; B median EPE `4.824 px`, PCK@5 `.504`, coverage
+`.289`.
+
+The machine had no usable NVIDIA driver, so GPU Stage 1 recovery and delta A/B
+were intentionally not run and are marked `not_run_cuda_unavailable`.
+
+The historical manually generated target set was processed without GT leakage
+using an explicit ordered key8 filename mapping. It produced overlays and a
+diagnostic observed_2d bundle with support coverage `.4675`; it has no stable
+style claim because there are no repeat generations or recovery validation.
+Artifacts: `output/elephant_source_graphdeco/historical_image_observation_diagnostic/`.

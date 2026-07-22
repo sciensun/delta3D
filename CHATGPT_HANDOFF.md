@@ -2,10 +2,9 @@
 
 ## Status
 
-**PARTIAL / SYNTHETIC OBSERVED-2D PASS**. The image-only fixed-bank acceptance
-experiment passes on the controlled body-roundness benchmark. No real
-generated target-image observations have passed the reliability gate, so there
-is no real stable style delta and Stage 2 remains paused.
+**PARTIAL**. The oracle observed-2D optimizer benchmark passes, but the first
+image-derived matcher baseline fails the body observation gate. No real stable
+style delta exists and Stage 2 remains paused.
 
 ## Objective
 
@@ -58,6 +57,12 @@ for 5%/10% outliers, and `0.9981` with 70% visibility. A/B active-region
 cosine was `1.0`; full-foreground weighted cosine was `0.99998` with 29.7%
 conflict from inactive near-zero entries.
 
+The image-derived Farneback run produced body clean-8 median EPE `3.691 px`,
+PCK@5 `.539`, coverage `.356`; ear PCK@5 `.822`, coverage `.344`; trunk PCK@5
+`.801`, coverage `.333`. Stage 1 recovery was not run because no NVIDIA
+driver was available. The historical target diagnostic produced support
+coverage `.4675` but is diagnostic-only and has no GT or repeat validation.
+
 The historical weak-target split result remains failed: weighted cosine
 `0.1176`, median per-Gaussian cosine `0.0749`, and directional conflict
 `46.5%`.
@@ -87,11 +92,10 @@ the research result is not yet a real style-transfer success.
 
 ## Next Experiment
 
-Generate repeated target/content images from the stylized object with strict
-camera, identity, pose, and topology preservation. Build source-indexed
-`observed_2d` bundles with foreground filtering, mutual matching, semantic
-constraints, visibility, and confidence. Run split/repeat/identity/intensity
-reliability analysis before promoting any delta.
+Improve image-derived matching first: test a local learned dense-feature/flow
+backend or stronger visibility/mask model until the body synthetic observation
+gate passes, then run GPU Stage 1 and A/B recovery. Only after that generate
+three real repeated target sets from the prepared pilot manifest.
 
 ## Artifacts
 
@@ -101,5 +105,5 @@ reliability analysis before promoting any delta.
 
 ## Git
 
-Commit SHA: `4379734df3980bc4d04cf8678bc1b6ebd1fa4ad3`.
+Commit SHA: see `git rev-parse HEAD` for this final commit.
 Push status: pushed to `delta3D/main`.

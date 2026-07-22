@@ -167,3 +167,19 @@ The stable component must be reproducible across views and repeated target
 generations, structurally coherent, and associated with a style operation and
 intensity. Topology-preserving continuous changes are in scope. Major topology
 changes, newly added parts, and removed parts are out of scope.
+
+## Image-Derived Observation Status
+
+The first image-derived baseline is implemented in
+`correspondence/matching_backends.py` and
+`correspondence/image_observations.py`. It uses same-view OpenCV Farneback
+flow, forward/backward cycle confidence, foreground filtering, projected
+footprint aggregation, and a coarse projected depth-bin visibility estimate.
+This is an implemented diagnostic, not a validated learned matcher. Body
+roundness failed the synthetic observation gate. The latest environment had no
+working NVIDIA driver, so fixed-bank Stage 1 recovery was not run for these
+image-derived bundles.
+
+Oracle target projections remain a synthetic upper bound. Image-derived target
+observations are matcher output. Real generated target observations require
+repeated quality-controlled views and have not produced a stable style delta.

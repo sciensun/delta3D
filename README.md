@@ -148,6 +148,27 @@ projection error. Eight-view robustness remained strong at global cosine
 outliers, and `0.9981` with 70% visibility. Stage 2 remains **Planned** and
 paused until real target repeats pass reliability gates.
 
+### Image-derived matching baseline
+
+**Implemented/Partially Validated:** `scripts/run_image_observation_benchmark.py`
+uses OpenCV Farneback same-view flow, forward/backward cycle checks, masks,
+local projected-footprint aggregation, and a documented coarse source Gaussian
+visibility estimate. On synthetic images, body roundness reached median EPE
+`3.691 px`, PCK@5 `0.539`, and visible coverage `0.356`, failing the
+observation gate. Ear and trunk reached PCK@5 `0.822` and `0.801` but remained
+below coverage acceptance. Stage 1 GPU recovery was not run because the NVIDIA
+driver was unavailable. These are image-derived matcher results, distinct from
+the previous oracle-projection benchmark.
+
+The historical target diagnostic is:
+
+```bash
+python scripts/run_historical_image_observation_diagnostic.py
+```
+
+It creates overlays and a diagnostic bundle only; it does not claim real target
+alignment or stable style transfer.
+
 ## Actual Interfaces
 
 Load a legacy synthetic oracle correspondence bundle:

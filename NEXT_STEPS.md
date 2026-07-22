@@ -153,3 +153,24 @@ python scripts/compare_mined_delta_consistency.py \
 The older missing-azimuth instructions above are historical; the exact
 eight-view split has now been rebuilt and evaluated. The current blocker is
 target correspondence quality, not camera matching.
+
+## Latest Image-Derived Decision
+
+The OpenCV Farneback baseline was implemented and run on all three synthetic
+teachers. Body roundness failed the observation gate: median EPE `3.691 px`,
+PCK@5 `.539`, and visible coverage `.356`. Ear and trunk had PCK@5 `.822` and
+`.801`, but coverage `.344` and `.333` plus long error tails, so they are not
+accepted as reliable observations. No Stage 1 recovery was run because the
+machine had no working NVIDIA driver. Do not mine deltas from these bundles.
+
+The next engineering decision is to improve source-to-target matching: test a
+locally available learned dense-feature/flow backend or a stronger mask/
+visibility model, then rerun the synthetic observation gate on body roundness.
+Stage 1 remains paused until the observation gate passes and CUDA is available.
+
+The historical target diagnostic is at
+`output/elephant_source_graphdeco/historical_image_observation_diagnostic/`.
+The first real pilot layout is prepared at
+`assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/`;
+it contains three empty repeat folders and a manifest, with no fabricated
+target images.
