@@ -36,5 +36,5 @@ next experiment should add silhouette/boundary observations and stronger
 multiscale graph priors, then rerun the sparse gate. No real target images were
 generated and no style-transfer claim is made.
 
-Implementation commit SHA: `pending until commit`.
+Implementation commit SHA: `4866c07`.
 Final HEAD is reported separately to avoid recursive metadata commits.
