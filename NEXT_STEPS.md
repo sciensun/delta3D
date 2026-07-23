@@ -2,31 +2,28 @@
 
 ## Active Decision
 
-Do not start Stage 2 or generate real targets yet. The stochastic benchmark
-shows that no-label shared-style extraction is viable at moderate nuisance
-with enough samples, but it is not reliable at stronger nuisance with only
-three to five samples. The recovered oracle-2D diagnostic is only partial
-because the full-bank CPU loop was memory-unstable.
+Select **R=5 standardized target samples** for the first real pilot. The v3
+controlled exact results improve from R=3 to R=5, and the full-bank recovered
+oracle-2D R=5 gate passes with structured no-label factorization. Do not
+generate them in this iteration; Stage 2 remains paused.
 
-Next, improve the recovered-candidate evaluation to a full-bank or documented
-larger sampled run, then decide whether the initial real pilot needs three or
-five standardized target samples. Do not use exact nuisance labels as the
-primary method and do not interpret the biased-nuisance case as identifiable.
+The five samples must use the same standardized prompt and condition. They are
+independent conditional generations, not deliberately heavy/slim/large-ear
+variants. Record observed nuisance only after generation and quality control.
 
-## Gates
+## Acceptance Evidence
 
-- exact candidates: no-label active cosine >= 0.90, explained variance >= 0.80,
-  nuisance leakage <= 0.20;
-- recovered oracle candidates: active cosine >= 0.85, explained variance >=
-  0.65, and improvement over a single recovered candidate;
-- background delta exactly zero and `d_scaling` exactly zero;
-- no Stage 2 or style-transfer claim from one source object.
+- 44,764-Gaussian full-bank recovered R=5 active cosine: `0.994` structured;
+- centered explained variance: `0.987`;
+- style leakage: `0.017`;
+- background energy: `0`;
+- `d_scaling`: exactly zero;
+- cache recovery: about `0.05 s` per candidate, peak RSS `424 MB`.
 
 ## Real Pilot Layout
 
-`assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/`
-contains `sample_A`, `sample_B`, and `sample_C`. All use the same standardized
-prompt and eight cameras. The folders are empty. Any observed color, texture,
-body, ear, trunk, or limb nuisance will be recorded post-generation rather
-than prescribed beforehand. Expand to five samples only if three-sample
-stability is insufficient.
+Expand the empty layout to `sample_A` through `sample_E`, each with the same
+eight cameras and the same prompt. Keep pre-generation observed appearance,
+geometry, and nuisance fields null. Only after five target sets pass semantic,
+silhouette, view, and observation checks should an instance-stable delta be
+considered. Cross-object style learning and Stage 2 remain blocked.

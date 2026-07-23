@@ -122,7 +122,7 @@ identifiable from one source without a prior, labels, or multiple sources.
 These are controlled deltas, not real target or style-transfer results.
 
 The prepared real pilot now uses three conditional target-template variants:
-`sample_A`, `sample_B`, and `sample_C`, all using the same standardized prompt.
+`sample_A` through `sample_E`, all using the same standardized prompt.
 Their folders are intentionally empty; natural post-generation nuisance is
 recorded only after images exist.
 `TargetTemplateRecord` records allowed variation, required invariants, and
@@ -133,6 +133,27 @@ the new graph-coupled solver both reached active cosine above `0.999999`, energy
 ratio about `1.002`, explained variance above `0.999998`, with zero background
 energy and exact-zero `d_scaling`. This validates the solver on oracle
 observations only; it does not validate image-derived matching.
+
+### Calibrated v3 full-bank recovery
+
+**Validated CPU:** `scripts/run_template_factorization_benchmark_v3.py` now
+calibrates the realized total nuisance norm, reports basis Gram matrices and
+rank, uses graph-smoothed/decorrelated nuisance modes, and runs the robustness
+branches present in the artifact. At mixed support and target nuisance norm
+ratio `0.5` (energy ratio `0.25`), the full 44,764-Gaussian, 8-view recovered
+candidate experiment used a reusable geometry cache. The structured no-label
+factorization reached active cosine `0.994`, conventional centered explained
+variance `0.987`, style leakage `0.017`, and exact background energy `0`; the
+single recovered candidate reached cosine `0.943` and explained variance
+`0.887`. Cache construction was `0.14 s`, recovery was about `0.05 s` per
+candidate, and peak RSS was about `424 MB`.
+
+The corrected interpretation is that R=`5` is the safer initial real pilot:
+the exact v3 R=`3/5/8` mixed, total norm-ratio `0.5` robust cosine means were
+`0.965/0.976/0.979`, but the real recovered full-bank gate has only been run
+at R=`5`. The pilot remains ungenerated and all five samples must use one
+standardized prompt. This is still a one-object instance-level result, not
+style transfer or cross-object generalization.
 
 ### Validated synthetic fixed-bank recovery
 

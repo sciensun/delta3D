@@ -1,8 +1,72 @@
 """CPU reprojection-only recovery diagnostic for observed_2d bundles."""
 import numpy as np
 import torch
+import time
 
 from .gaussian_visibility import project_points
+
+
+def build_geometry_cache(source_xyz, cameras, knn=8, jacobian_eps=1e-3):
+    """Build reusable source geometry for multiple observed-2d candidates."""
+    started = time.perf_counter()
+    xyz = torch.as_tensor(source_xyz).float().cpu()
+    source_views, jacobians = [], []
+    for camera in cameras:
+        base, _, _ = project_points(xyz, camera.full_proj_transform,
+                                    camera.image_width, camera.image_height)
+        columns = []
+        for axis in range(3):
+            shifted = xyz.clone(); shifted[:, axis] += jacobian_eps
+            plus, _, _ = project_points(shifted, camera.full_proj_transform,
+                                        camera.image_width, camera.image_height)
+            columns.append((plus - base) / jacobian_eps)
+        source_views.append(base)
+        jacobians.append(torch.stack(columns, dim=-1))
+    try:
+        from scipy.spatial import cKDTree
+        _, neighbors = cKDTree(xyz.numpy()).query(xyz.numpy(), k=min(knn + 1, len(xyz)))
+        neighbors = np.asarray(neighbors)[:, 1:]
+    except Exception:
+        neighbors = np.tile(np.arange(len(xyz))[:, None], (1, min(knn, len(xyz))))
+    neighbors = torch.from_numpy(neighbors).long()
+    return {"source_xyz": xyz, "source_views": torch.stack(source_views),
+            "jacobians": torch.stack(jacobians), "neighbors": neighbors,
+            "degree": torch.full((len(xyz),), neighbors.shape[1], dtype=torch.float32),
+            "knn": int(neighbors.shape[1]),
+            "cache_build_seconds": time.perf_counter() - started}
+
+
+def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=None,
+                                    iterations=40, graph_lambda=0.01,
+                                    magnitude_lambda=1e-4, min_support=2,
+                                    huber_delta=3.0):
+    """Vectorized graph-coupled recovery using a reusable geometry cache."""
+    started = time.perf_counter()
+    target_xy = torch.as_tensor(target_xy).float().cpu()
+    visibility = torch.as_tensor(visibility).bool().cpu()
+    confidence = torch.ones_like(visibility, dtype=torch.float32) if confidence is None else torch.as_tensor(confidence).float().cpu()
+    views, jac, neighbors = cache["source_views"], cache["jacobians"], cache["neighbors"]
+    residual = target_xy - views
+    weights = visibility.float() * confidence.clamp_min(0)
+    normal = torch.einsum("vn,vnij,vnik->njk", weights, jac, jac)
+    rhs = torch.einsum("vn,vnij,vni->nj", weights, jac, residual)
+    eye = torch.eye(3).expand(normal.shape[0], 3, 3)
+    normal = torch.nan_to_num(normal) + magnitude_lambda * eye
+    rhs = torch.nan_to_num(rhs)
+    support = visibility.sum(0)
+    delta = torch.zeros((normal.shape[0], 3))
+    degree = cache["degree"]
+    graph_eye = graph_lambda * degree[:, None, None] * eye
+    for _ in range(iterations):
+        neighbor_sum = delta[neighbors].sum(1)
+        lhs = normal + graph_eye + 1e-6 * eye
+        delta = torch.linalg.solve(lhs, rhs + graph_lambda * neighbor_sum)
+    delta[support < min_support] = 0
+    return {"d_xyz": delta, "support_count": support,
+            "reprojection_residual": residual, "source_views": views,
+            "jacobians": jac, "neighbors": neighbors,
+            "cache_build_seconds": cache.get("cache_build_seconds", 0.0),
+            "recovery_seconds": time.perf_counter() - started}
 
 
 def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
@@ -99,6 +163,13 @@ def recover_xyz_graph_coupled(source_xyz, cameras, target_xy, visibility,
     differentiable Stage 1. It validates whether observations contain enough
     3D information before CUDA optimization is attempted.
     """
+    cache = build_geometry_cache(source_xyz, cameras, knn=knn)
+    return recover_xyz_graph_coupled_cached(cache, target_xy, visibility,
+        confidence, iterations=iterations, graph_lambda=graph_lambda,
+        magnitude_lambda=magnitude_lambda, min_support=min_support,
+        huber_delta=huber_delta)
+
+    # Legacy scalar implementation retained below for source-level reference.
     base = recover_xyz_from_observations(
         source_xyz, cameras, target_xy, visibility, confidence,
         iterations=0, min_support=min_support, propagate=False,

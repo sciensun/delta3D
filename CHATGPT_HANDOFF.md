@@ -1,39 +1,40 @@
-# ChatGPT Handoff: Stochastic Target-Template Factorization
+# ChatGPT Handoff: Calibrated Full-Bank Target-Template Factorization
 
 ## Status
 
-**PARTIAL.** The v1 sanity-test interpretation was corrected and v2 stochastic
-factorization passed at low/moderate nuisance for R=5/8, but recovered-candidate
-full-bank validation remains incomplete. Stage 2 was not started.
+**PARTIAL / controlled full-bank gate PASS.** No real target images or Stage 2
+training were run.
 
 ## Changes
 
-- Corrected distinct global/foreground/active metric regions and labels.
-- Normalized robust trimming by valid confidence.
-- Added v2 random independent nuisance benchmark for R=3/5/8 and three seeds.
-- Added biased-nuisance identifiability failure case.
-- Added recovered oracle observed-2D candidate factorization diagnostic.
-- Corrected real pilot to three identical standardized prompts with null
-  pre-generation nuisance fields.
+- calibrated total realized nuisance norm rather than per-basis ratio;
+- added graph-smoothed/decorrelated nuisance modes and support conditions;
+- added actual outlier, confidence, missing-region, invalid, poor-candidate,
+  label, and bias branches;
+- added structured no-label factorization;
+- added reusable/vectorized full-bank CPU geometry cache;
+- corrected docs and selected five standardized pilot samples.
 
 ## Results
 
-No-label robust active cosine / explained variance:
-`R5, nuisance .25 = .935/.854`; `R8, nuisance .25 = .972/.941`;
-`R5, nuisance .5 = .788/.415`; `R8, nuisance .5 = .896/.767`.
-Sampled recovered-oracle diagnostic: cosine `.901`, energy `.670`, explained
-variance `.802`, versus single candidate cosine `.656`.
+Full bank: 44,764 Gaussians, 8 views, R=5, total nuisance norm/style norm
+`0.5` (energy ratio `0.25`). Structured no-label recovery: active cosine
+`0.994`, centered explained variance `0.987`, style leakage `0.017`, background
+energy `0`, and exact-zero `d_scaling`. Single candidate: cosine `0.943`,
+explained variance `0.887`. Cache `0.14 s`, recovery about `0.05 s/candidate`,
+peak RSS about `424 MB`.
 
 ## Limitation
 
-The full-bank recovered-candidate CPU loop was memory-unstable; the reported
-recovered result evaluates 4,096 active Gaussians. No real target images,
-CUDA run, cross-object style representation, or Stage 2 model exists.
+This remains a one-object controlled oracle-observation result. Systematic
+target-template bias is not identifiable from one source. Real standardized
+targets, CUDA validation, cross-object representation, and Stage 2 remain
+unimplemented.
 
 ## Decision
 
-Keep Stage 2 paused. Complete full-bank/documented sampled recovered-candidate
-validation before the three-sample real pilot.
+Use five identical-condition standardized target samples for the first real
+pilot. Generate and evaluate them in the next iteration, not this one.
 
-Implementation commit SHA: `5a5617bafebda581d111f0b654eab76f50375246`.
-Final metadata commit SHA: `f357ffbd97922241cbf771b4b4b69471e31bf487`.
+Implementation commit SHA: to be recorded after commit.
+This handoff belongs to the final commit reported by cdx.

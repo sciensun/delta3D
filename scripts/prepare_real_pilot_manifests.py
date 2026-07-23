@@ -20,7 +20,7 @@ def main():
     a = p.parse_args()
     root = Path(a.root) / "real_pilot_blocky_to_rounded"
     names = sorted(p.name for p in Path(a.source_image_root).glob("*.png"))
-    target_names = ["sample_A", "sample_B", "sample_C"]
+    target_names = ["sample_A", "sample_B", "sample_C", "sample_D", "sample_E"]
     records = []
     for repeat in target_names:
         target_root = root / repeat / "targets_key8"

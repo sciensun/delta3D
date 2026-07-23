@@ -136,14 +136,15 @@ def delta_metrics(pred, target, active_mask=None, source_xyz=None,
     return result
 
 
-def factorize_candidates(deltas, confidence=None, nuisance_features=None, trim_fraction=0.2):
+def factorize_candidates(deltas, confidence=None, nuisance_features=None, trim_fraction=0.2,
+                         geometric_iterations=32, robust_iterations=8):
     deltas = torch.as_tensor(deltas).float()
     result = {
         "single_template": deltas[0],
         "mean": weighted_mean(deltas, confidence),
         "median": coordinate_median(deltas, confidence),
-        "geometric_median": geometric_median(deltas, confidence),
-        "robust_shared": robust_shared(deltas, confidence, trim_fraction=trim_fraction),
+        "geometric_median": geometric_median(deltas, confidence, iterations=geometric_iterations),
+        "robust_shared": robust_shared(deltas, confidence, trim_fraction=trim_fraction, iterations=robust_iterations),
     }
     if nuisance_features is not None:
         shared, nuisance, reconstructed = nuisance_regression(deltas, nuisance_features, confidence)
@@ -151,3 +152,53 @@ def factorize_candidates(deltas, confidence=None, nuisance_features=None, trim_f
         result["nuisance_components"] = nuisance
         result["reconstructed"] = reconstructed
     return result
+
+
+def structured_no_label_factorization(deltas, confidence=None, rank=2,
+                                      iterations=20, lambda_sparse=0.0,
+                                      neighbors=None, graph_blend=0.05,
+                                      foreground_mask=None):
+    """Alternating low-rank shared/nuisance factorization without labels.
+
+    The intercept is S, mode fields are U, coefficients A are centered over
+    templates, and E is the residual. This is intentionally deterministic and
+    CPU-safe; it is not a neural model and never reads a hidden teacher.
+    """
+    d = torch.as_tensor(deltas).float()
+    r, n, c = d.shape
+    if rank >= r:
+        rank = max(1, r - 1)
+    w = _as_confidence(d, confidence)
+    foreground_mask = torch.ones(n, dtype=torch.bool) if foreground_mask is None else torch.as_tensor(foreground_mask).bool()
+    d[:, ~foreground_mask] = 0
+    s = weighted_mean(d, w)
+    centered = d - s[None]
+    # Deterministic initialization from the low-dimensional template axis.
+    cov = torch.einsum("rnc,snc->rs", centered, centered)
+    _, vec = torch.linalg.eigh(cov)
+    a = vec[:, -rank:].float()
+    a = a - a.mean(0, keepdim=True)
+    u = torch.zeros((rank, n, c))
+    eye = 1e-5 * torch.eye(rank)
+    for _ in range(iterations):
+        aa = a.T @ a + eye
+        u = torch.einsum("kr,rnc->knc", torch.linalg.solve(aa, a.T), d - s[None])
+        if neighbors is not None and graph_blend > 0:
+            u = (1 - graph_blend) * u + graph_blend * u[:, neighbors].mean(2)
+        uu = torch.einsum("knc,lnc->kl", u, u) + eye
+        a = torch.einsum("rnc,knc,kl->rl", d - s[None], u, torch.linalg.inv(uu))
+        a = a - a.mean(0, keepdim=True)
+        s = weighted_mean(d - torch.einsum("rk,knc->rnc", a, u), w)
+        if neighbors is not None and graph_blend > 0:
+            s = (1 - graph_blend) * s + graph_blend * s[neighbors].mean(1)
+        s[~foreground_mask] = 0
+        u[:, ~foreground_mask] = 0
+    reconstructed = s[None] + torch.einsum("rk,knc->rnc", a, u)
+    residual = d - reconstructed
+    reconstructed[:, ~foreground_mask] = 0
+    residual[:, ~foreground_mask] = 0
+    if lambda_sparse > 0:
+        residual = torch.sign(residual) * torch.relu(residual.abs() - lambda_sparse)
+    return {"shared": s, "nuisance_modes": u, "coefficients": a,
+            "residual": residual, "reconstructed": reconstructed,
+            "rank": int(rank), "convergence_residual_norm": float(residual.norm())}

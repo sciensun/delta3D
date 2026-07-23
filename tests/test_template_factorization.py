@@ -5,6 +5,7 @@ import torch
 
 from style_data import StyleTaskRecord, TargetTemplateRecord
 from stage1.template_factorization import factorize_candidates, delta_metrics, robust_shared
+from correspondence.cpu_recovery import build_geometry_cache, recover_xyz_graph_coupled_cached
 
 
 def test_target_template_schema_and_legacy_roundtrip():
@@ -44,3 +45,29 @@ def test_distinct_region_metrics_and_confidence_normalized_trim():
     conf = torch.ones(3, 4); conf[2] = 0.01
     estimate = robust_shared(deltas, conf, trim_fraction=1.0 / 3.0)
     assert float(estimate.abs().max()) < 1.0
+
+
+def test_structured_no_label_and_exact_background():
+    from stage1.template_factorization import structured_no_label_factorization
+    torch.manual_seed(8)
+    shared = torch.randn(12, 3) * 0.01
+    deltas = torch.stack([shared + torch.randn_like(shared) * 0.002 for _ in range(5)])
+    mask = torch.zeros(12, dtype=torch.bool); mask[:8] = True
+    deltas[:, ~mask] = 0
+    result = structured_no_label_factorization(deltas, rank=2, iterations=4, foreground_mask=mask)
+    assert torch.equal(result["shared"][~mask], torch.zeros_like(result["shared"][~mask]))
+
+
+def test_geometry_cache_reuse_shapes_and_determinism():
+    class Camera:
+        image_width = 32; image_height = 32
+        full_proj_transform = torch.eye(4)
+    xyz = torch.randn(20, 3); cameras = [Camera(), Camera()]
+    cache = build_geometry_cache(xyz, cameras, knn=3)
+    target = cache["source_views"].clone()
+    vis = torch.ones(2, 20, dtype=torch.bool)
+    first = recover_xyz_graph_coupled_cached(cache, target, vis, iterations=2)
+    second = recover_xyz_graph_coupled_cached(cache, target, vis, iterations=2)
+    assert cache["neighbors"].shape == (20, 3)
+    assert torch.allclose(first["d_xyz"], second["d_xyz"])
+    assert float(first["d_xyz"].abs().max()) < 1e-5

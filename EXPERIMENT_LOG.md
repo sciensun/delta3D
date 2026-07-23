@@ -502,7 +502,51 @@ and explained variance `0.802`, versus a single recovered candidate cosine
 `0.656`, energy `1.817`, and explained variance `-0.065`. This is a partial
 recovered-candidate validation, not a full-bank acceptance result.
 
-The real pilot now has `sample_A`, `sample_B`, and `sample_C`, all using the
+The real pilot now has `sample_A` through `sample_E`, all using the
 same standardized prompt. Pre-generation observed nuisance fields are null;
 the samples are independent conditional generations, not deliberately heavy,
 slim, or large-ear variants. No real images were generated.
+
+## Calibrated v3 and Full-Bank Recovery (2026-07-23)
+
+Command:
+
+```bash
+python scripts/run_template_factorization_benchmark_v3.py
+```
+
+Artifact:
+`output/elephant_source_graphdeco/template_factorization_benchmark_v3/benchmark_v3_summary.json`.
+
+V3 reports per-candidate realized nuisance norm/style norm, per-template
+nuisance energy/style energy, noise ratio, finite-sample nuisance mean, Gram
+matrix, singular values/effective rank, total candidate residual, and support
+condition. The target ratio is now a total realized norm ratio; at target
+`0.5`, the mean nuisance energy/style energy is `0.25`, not `0.5`.
+
+The mixed-support exact benchmark used five seeds and R=`3/5/8`. Robust active
+cosine means at total norm ratio `0.5` were `0.965`, `0.976`, and `0.979`
+respectively. The actual branches saved in the artifact include one/two
+outliers, unequal confidence, missing local region, partially invalid delta,
+poor recovered candidate, and the biased-nuisance limitation. All use zero
+background and zero `d_scaling`.
+
+The reusable geometry cache stores source projections, finite-difference
+Jacobians, KNN neighbors, and graph degree once. The vectorized full-bank run
+used 44,764 Gaussians and 8 cameras, K=`8`; cache build was `0.14 s`, candidate
+recovery was approximately `0.05 s` each, and peak RSS was approximately
+`424 MB`. Five observed_2d bundles were saved with `target_xyz=None`.
+
+At mixed total nuisance norm ratio `0.5`, full-bank recovered factorization
+reported:
+
+| method | active cosine | centered explained variance | style leakage | background energy |
+|---|---:|---:|---:|---:|
+| single recovered candidate | 0.943 | 0.887 | 0.128 | 0 |
+| robust shared | 0.977 | 0.953 | 0.059 | 0 |
+| structured no-label | 0.994 | 0.987 | 0.017 | 0 |
+
+The full-bank recovered gate passes for this controlled R=5 case. No real
+target images or Stage 2 training were run. The deliberate systematic-bias
+case remains non-identifiable from one source: a shared target bias cannot be
+separated from style without a prior, labels, or multiple source objects.

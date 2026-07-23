@@ -195,6 +195,14 @@ There are two levels of the style claim:
 Only the second level supports a style-transfer claim. No single-object result
 in this repository has reached that claim.
 
+The v1 finite symmetric benchmark is only an implementation sanity check. The
+v3 benchmark samples nuisance coefficients independently, calibrates the
+realized total norm, decorrelates graph-smoothed modes, and evaluates R=3/5/8
+with robustness branches. A structured no-label factorizer is used only after
+candidate recovery; exact nuisance labels remain an evaluator upper bound.
+Full-bank recovered-candidate validation currently supports R=5 at mixed
+nuisance norm ratio 0.5, not real generated targets.
+
 For each `(object, style_operation, intensity, repeat, view)` task:
 
 ```text
