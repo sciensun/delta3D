@@ -35,5 +35,5 @@ CUDA run, cross-object style representation, or Stage 2 model exists.
 Keep Stage 2 paused. Complete full-bank/documented sampled recovered-candidate
 validation before the three-sample real pilot.
 
-Implementation commit SHA: to be recorded after commit.
-Final metadata commit SHA: to be recorded after metadata commit.
+Implementation commit SHA: `5a5617bafebda581d111f0b654eab76f50375246`.
+Final metadata commit SHA: to be recorded by the following metadata commit.
