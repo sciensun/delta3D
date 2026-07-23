@@ -299,3 +299,9 @@ validated, but the current 10--40% sparse benchmark does not meet the dense
 recovery gate. The next active work is silhouette/boundary observations and
 multiscale structural priors; real target generation and Stage 2 remain
 paused. See `NEXT_STEPS.md` and `EXPERIMENT_LOG.md`.
+
+Track-aware sampling is available through `scripts/report_sparse_support.py`
+and `scripts/run_track_aware_sparse_benchmark.py`; a control-node translation
+prior is available through `scripts/run_control_graph_benchmark.py`. These
+separate multi-view track observability from dense completion. The current
+results are promising but partial and do not authorize Stage 2.

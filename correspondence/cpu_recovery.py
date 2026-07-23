@@ -33,14 +33,30 @@ def build_geometry_cache(source_xyz, cameras, knn=8, jacobian_eps=1e-3):
     except Exception:
         neighbors = np.tile(np.arange(len(xyz))[:, None], (1, min(knn, len(xyz))))
     neighbors = torch.from_numpy(neighbors).long()
+    # Build a symmetric mutual-KNN graph.  The fixed-width representation is
+    # padded with self edges, which keeps the batched solver unchanged.
+    directed = neighbors.clone()
+    edge_sets = [set(int(x) for x in directed[i].tolist()) for i in range(len(xyz))]
+    symmetric = []
+    for i in range(len(xyz)):
+        mutual = [j for j in edge_sets[i] if i in edge_sets[j]]
+        union = mutual or list(edge_sets[i])
+        symmetric.append(union[:min(knn, len(union))])
+    sym = torch.empty_like(neighbors)
+    for i, row in enumerate(symmetric):
+        row = row + [i] * (neighbors.shape[1] - len(row))
+        sym[i] = torch.tensor(row[:neighbors.shape[1]])
+    neighbors = sym
     distance = (xyz[neighbors] - xyz[:, None]).norm(dim=-1).clamp_min(1e-6)
-    graph_weights = (1.0 / distance)
+    distance[neighbors == torch.arange(len(xyz))[:, None]] = 1.0
+    graph_weights = 1.0 / distance
+    graph_weights[neighbors == torch.arange(len(xyz))[:, None]] = 0.0
     graph_weights = graph_weights / graph_weights.sum(1, keepdim=True).clamp_min(1e-8)
     return {"source_xyz": xyz, "source_views": source_views,
             "jacobians": jacobians, "neighbors": neighbors, "graph_weights": graph_weights,
             "degree": torch.ones((len(xyz),), dtype=torch.float32),
             "cameras": cameras, "jacobian_eps": jacobian_eps,
-            "knn": int(neighbors.shape[1]),
+            "knn": int(neighbors.shape[1]), "graph_type": "symmetric_mutual_knn",
             "cache_build_seconds": time.perf_counter() - started}
 
 
@@ -80,18 +96,14 @@ def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=No
         normal = torch.nan_to_num(normal) + magnitude_lambda * eye
         rhs = torch.nan_to_num(rhs)
         neighbor_mean = (delta[neighbors] * graph_weights[..., None]).sum(1)
-        lhs = normal + graph_lambda * eye + 1e-4 * eye
+        lhs = torch.nan_to_num(normal + graph_lambda * eye + 1e-2 * eye)
         # The reprojection residual is linearized around the current delta, so
         # the solve returns an increment.  Treating it as an absolute delta
         # makes IRLS diverge even with complete, noiseless observations.
         rhs_step = rhs + graph_lambda * (neighbor_mean - delta) - magnitude_lambda * delta
-        try:
-            step_update = torch.linalg.solve(lhs, rhs_step)
-        except RuntimeError:
-            # Sparse visibility can leave a few local normal matrices nearly
-            # singular.  Pinv is a deterministic CPU fallback for those
-            # batches and keeps the diagnostic from dropping valid points.
-            step_update = torch.bmm(torch.linalg.pinv(lhs), rhs_step.unsqueeze(-1)).squeeze(-1)
+        # The explicit diagonal floor keeps all local 3x3 systems positive
+        # definite, avoiding a full-bank pseudoinverse allocation.
+        step_update = torch.linalg.solve(lhs, rhs_step)
         step_update[frozen_mask | ~foreground_mask] = 0
         delta = delta + step_update
         active = foreground_mask & ~frozen_mask

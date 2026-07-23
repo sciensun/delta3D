@@ -590,3 +590,19 @@ at 20%, `0.021/0.091/0.112/0.413` at 40%, and
 rescue the current low-coverage observations, while all methods are near the
 oracle result at complete coverage. Artifact:
 `output/elephant_source_graphdeco/sparse_observation_benchmark/sparse_recovered_factorization.json`.
+
+## Track-aware observability and control graph (2026-07-23)
+
+Added `correspondence/sparse_sampling.py`, `correspondence/control_graph.py`,
+`scripts/report_sparse_support.py`, `scripts/run_track_aware_sparse_benchmark.py`,
+and `scripts/run_control_graph_benchmark.py`. Track fraction is distinct from
+independent view dropout. The support artifact reports foreground >=2-view
+support of approximately `0.199/0.397` at retained track fractions `0.2/0.4`;
+fixed two-view tracks have no tracks with three views.
+
+Representative track-aware recovery on one deterministic seed gives anchor
+cosine `1.0` for all teachers and full active cosine body/ear/trunk of
+`0.898/0.880/0.881` at track fraction `0.2`, and `0.972/0.963/0.959` at
+`0.4`. A 64-control translation graph gives `0.938/0.942/0.908` for
+body/ear/trunk at `0.2`. This is promising but not a five-seed acceptance gate.
+Silhouette-only and track-plus-silhouette were not run in this iteration.

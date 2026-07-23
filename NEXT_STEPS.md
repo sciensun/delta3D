@@ -38,6 +38,15 @@ for structured/mean-plus-graph is `0.046/0.009` at 20%, `0.413/0.112` at 40%,
 and `0.995/0.994` at 100%. Factorization is not the limiting component at low
 coverage.
 
+Track-aware support separates the old view-dropout result: track fractions
+`0.2/0.4` retain approximately `0.199/0.397` foreground tracks with at least
+two views. Representative anchor cosine is `1.0`; graph-completed active
+cosine body/ear/trunk is `0.898/0.880/0.881` at `0.2` and
+`0.972/0.963/0.959` at `0.4`. A 64-control translation graph reaches
+`0.938/0.942/0.908` at `0.2`. These are promising diagnostics, not the
+five-seed acceptance gate. The next active experiment is five-seed track-aware
+validation plus silhouette/boundary observations.
+
 ## Real Pilot Layout
 
 Expand the empty layout to `sample_A` through `sample_E`, each with the same

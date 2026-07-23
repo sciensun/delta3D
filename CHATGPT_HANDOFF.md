@@ -18,6 +18,8 @@ deformation while keeping background and d_scaling exactly zero.
 - added confidence-aware structured factorization updates;
 - added five-sample real-pilot QC preflight;
 - added post-recovery five-candidate sparse factorization comparison;
+- added track-aware support diagnostics, symmetric mutual-KNN graph, and
+  control-node translation prior;
 - updated sparse benchmark and research documentation.
 
 ## Validation
@@ -33,11 +35,17 @@ three fixture-based tests were skipped because pytest is unavailable.
 After sparse recovery, body active cosine for structured/mean-plus-graph was
 `0.046/0.009` at 20%, `0.413/0.112` at 40%, and `0.995/0.994` at 100%.
 
+Track-aware diagnostics show >=2-view support of about `0.199/0.397` at
+track fractions `0.2/0.4`. Representative anchor cosine is `1.0`; graph
+completion active cosine body/ear/trunk is `0.898/0.880/0.881` at `0.2` and
+`0.972/0.963/0.959` at `0.4`. A 64-control graph reaches
+`0.938/0.942/0.908` on the same teachers at `0.2`.
+
 ## Limitation and decision
 
 Sparse points alone do not presently provide sufficient dense recovery. The
-next experiment should add silhouette/boundary observations and stronger
-multiscale graph priors, then rerun the sparse gate. No real target images were
+next experiment should complete five-seed track-aware validation and add
+silhouette/boundary observations. No real target images were
 generated and no style-transfer claim is made.
 
 Implementation commit SHA: `4866c07`.

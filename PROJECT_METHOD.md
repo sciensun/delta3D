@@ -252,3 +252,9 @@ fails the 20--40% dense-recovery gate. Silhouette/boundary observations and
 stronger structural priors are therefore required before real target images.
 Structured factorization remains evaluated separately from mean plus graph
 smoothing; no Stage 2 training or part compression is permitted yet.
+
+Track-aware sparsity is a separate diagnostic: a track fraction retains a
+Gaussian across its valid views and is not per-view observation retention. The
+symmetric mutual-KNN graph and low-dimensional control-node translation prior
+are implemented. Control interpolation preserves partition of unity and keeps
+background/frozen Gaussian motion exactly zero.
