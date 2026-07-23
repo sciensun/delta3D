@@ -581,3 +581,12 @@ method because it intentionally zeros unobserved foreground.
 Added `scripts/qc_real_pilot.py`; with no real images it correctly reports the
 five-sample pilot as `PENDING`. No Stage 2, real image generation, d_scaling,
 or background motion was run.
+
+The follow-up `scripts/run_sparse_factorization.py` recovered five synthetic
+body candidates and factorized them after sparse recovery. Active cosine for
+single/mean/mean+graph/structured was respectively `-0.000/0.008/0.009/0.046`
+at 20%, `0.021/0.091/0.112/0.413` at 40%, and
+`0.959/0.995/0.994/0.995` at 100%. Thus structured factorization does not
+rescue the current low-coverage observations, while all methods are near the
+oracle result at complete coverage. Artifact:
+`output/elephant_source_graphdeco/sparse_observation_benchmark/sparse_recovered_factorization.json`.

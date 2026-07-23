@@ -33,6 +33,11 @@ cosine `1.0`, energy ratio `1.0`, and near-zero reprojection residual.
 The next technical decision is whether to add silhouette/boundary observations
 and stronger multiscale graph priors, or to require higher point coverage.
 
+Post-recovery factorization confirms the same bottleneck: body active cosine
+for structured/mean-plus-graph is `0.046/0.009` at 20%, `0.413/0.112` at 40%,
+and `0.995/0.994` at 100%. Factorization is not the limiting component at low
+coverage.
+
 ## Real Pilot Layout
 
 Expand the empty layout to `sample_A` through `sample_E`, each with the same

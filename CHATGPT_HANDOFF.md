@@ -17,6 +17,7 @@ deformation while keeping background and d_scaling exactly zero.
 - added robust singular-normal fallback and convergence history;
 - added confidence-aware structured factorization updates;
 - added five-sample real-pilot QC preflight;
+- added post-recovery five-candidate sparse factorization comparison;
 - updated sparse benchmark and research documentation.
 
 ## Validation
@@ -28,6 +29,9 @@ seeds. At 20 percent active-cosine means were body `0.006`, ear `0.048`, trunk
 `1.000`. Direct full-observation body sanity: cosine `1.0`, energy ratio `1.0`,
 near-zero reprojection residual. CPU syntax and 16 fixture-free tests passed;
 three fixture-based tests were skipped because pytest is unavailable.
+
+After sparse recovery, body active cosine for structured/mean-plus-graph was
+`0.046/0.009` at 20%, `0.413/0.112` at 40%, and `0.995/0.994` at 100%.
 
 ## Limitation and decision
 
