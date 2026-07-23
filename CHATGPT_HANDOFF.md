@@ -36,4 +36,4 @@ Keep Stage 2 paused. Complete full-bank/documented sampled recovered-candidate
 validation before the three-sample real pilot.
 
 Implementation commit SHA: `5a5617bafebda581d111f0b654eab76f50375246`.
-Final metadata commit SHA: to be recorded by the following metadata commit.
+Final metadata commit SHA: `f357ffbd97922241cbf771b4b4b69471e31bf487`.
