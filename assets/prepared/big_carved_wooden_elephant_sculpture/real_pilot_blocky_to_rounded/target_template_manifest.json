@@ -1,0 +1,206 @@
+[
+  {
+    "target_template_id": "big_carved_wooden_elephant_sculpture:template_A",
+    "target_style_family": "blocky_to_rounded",
+    "style_operation": "blocky_to_rounded",
+    "style_intensity": 0.5,
+    "template_variant_id": "template_A",
+    "target_style_attributes": {
+      "blockiness": "moderately reduced",
+      "roundness": "increased"
+    },
+    "template_nuisance_attributes": {
+      "appearance": "similar natural color",
+      "geometry": "medium body build"
+    },
+    "appearance_nuisance_attributes": {
+      "allowed": "controlled color/surface variation"
+    },
+    "geometry_nuisance_attributes": {
+      "allowed": "moderate body/part proportion variation"
+    },
+    "required_invariants": [
+      "elephant category",
+      "main parts",
+      "compatible topology",
+      "broad pose",
+      "camera/view"
+    ],
+    "allowed_variations": [
+      "color",
+      "surface appearance",
+      "moderate body build",
+      "moderate part proportions"
+    ],
+    "forbidden_changes": [
+      "added/deleted major parts",
+      "extreme pose change",
+      "camera change"
+    ],
+    "view_relation": {
+      "same_camera_names": [
+        "0072_elev000_az000.png",
+        "0081_elev000_az045.png",
+        "0090_elev000_az090.png",
+        "0099_elev000_az135.png",
+        "0108_elev000_az180.png",
+        "0117_elev000_az225.png",
+        "0126_elev000_az270.png",
+        "0135_elev000_az315.png"
+      ]
+    },
+    "semantic_part_requirements": [
+      "head",
+      "trunk",
+      "ears",
+      "legs",
+      "body",
+      "base"
+    ],
+    "generation_seed": null,
+    "generation_run": "not_generated",
+    "quality_metadata": {
+      "required_complete_views": 8,
+      "requires_manual_silhouette_check": true,
+      "requires_semantic_part_check": true,
+      "template_is_conditional_sample": true
+    },
+    "object_id": "big_carved_wooden_elephant_sculpture"
+  },
+  {
+    "target_template_id": "big_carved_wooden_elephant_sculpture:template_B",
+    "target_style_family": "blocky_to_rounded",
+    "style_operation": "blocky_to_rounded",
+    "style_intensity": 0.5,
+    "template_variant_id": "template_B",
+    "target_style_attributes": {
+      "blockiness": "moderately reduced",
+      "roundness": "increased"
+    },
+    "template_nuisance_attributes": {
+      "appearance": "different natural color",
+      "geometry": "slightly heavier body"
+    },
+    "appearance_nuisance_attributes": {
+      "allowed": "controlled color/surface variation"
+    },
+    "geometry_nuisance_attributes": {
+      "allowed": "moderate body/part proportion variation"
+    },
+    "required_invariants": [
+      "elephant category",
+      "main parts",
+      "compatible topology",
+      "broad pose",
+      "camera/view"
+    ],
+    "allowed_variations": [
+      "color",
+      "surface appearance",
+      "moderate body build",
+      "moderate part proportions"
+    ],
+    "forbidden_changes": [
+      "added/deleted major parts",
+      "extreme pose change",
+      "camera change"
+    ],
+    "view_relation": {
+      "same_camera_names": [
+        "0072_elev000_az000.png",
+        "0081_elev000_az045.png",
+        "0090_elev000_az090.png",
+        "0099_elev000_az135.png",
+        "0108_elev000_az180.png",
+        "0117_elev000_az225.png",
+        "0126_elev000_az270.png",
+        "0135_elev000_az315.png"
+      ]
+    },
+    "semantic_part_requirements": [
+      "head",
+      "trunk",
+      "ears",
+      "legs",
+      "body",
+      "base"
+    ],
+    "generation_seed": null,
+    "generation_run": "not_generated",
+    "quality_metadata": {
+      "required_complete_views": 8,
+      "requires_manual_silhouette_check": true,
+      "requires_semantic_part_check": true,
+      "template_is_conditional_sample": true
+    },
+    "object_id": "big_carved_wooden_elephant_sculpture"
+  },
+  {
+    "target_template_id": "big_carved_wooden_elephant_sculpture:template_C",
+    "target_style_family": "blocky_to_rounded",
+    "style_operation": "blocky_to_rounded",
+    "style_intensity": 0.5,
+    "template_variant_id": "template_C",
+    "target_style_attributes": {
+      "blockiness": "moderately reduced",
+      "roundness": "increased"
+    },
+    "template_nuisance_attributes": {
+      "appearance": "different natural color",
+      "geometry": "slightly slimmer body and moderate ear variation"
+    },
+    "appearance_nuisance_attributes": {
+      "allowed": "controlled color/surface variation"
+    },
+    "geometry_nuisance_attributes": {
+      "allowed": "moderate body/part proportion variation"
+    },
+    "required_invariants": [
+      "elephant category",
+      "main parts",
+      "compatible topology",
+      "broad pose",
+      "camera/view"
+    ],
+    "allowed_variations": [
+      "color",
+      "surface appearance",
+      "moderate body build",
+      "moderate part proportions"
+    ],
+    "forbidden_changes": [
+      "added/deleted major parts",
+      "extreme pose change",
+      "camera change"
+    ],
+    "view_relation": {
+      "same_camera_names": [
+        "0072_elev000_az000.png",
+        "0081_elev000_az045.png",
+        "0090_elev000_az090.png",
+        "0099_elev000_az135.png",
+        "0108_elev000_az180.png",
+        "0117_elev000_az225.png",
+        "0126_elev000_az270.png",
+        "0135_elev000_az315.png"
+      ]
+    },
+    "semantic_part_requirements": [
+      "head",
+      "trunk",
+      "ears",
+      "legs",
+      "body",
+      "base"
+    ],
+    "generation_seed": null,
+    "generation_run": "not_generated",
+    "quality_metadata": {
+      "required_complete_views": 8,
+      "requires_manual_silhouette_check": true,
+      "requires_semantic_part_check": true,
+      "template_is_conditional_sample": true
+    },
+    "object_id": "big_carved_wooden_elephant_sculpture"
+  }
+]

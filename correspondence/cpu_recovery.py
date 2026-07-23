@@ -87,3 +87,56 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
     return {"d_xyz": delta, "support_count": support,
             "reprojection_residual": residual, "source_views": source_views,
             "jacobians": jacobians}
+
+
+def recover_xyz_graph_coupled(source_xyz, cameras, target_xy, visibility,
+                              confidence=None, iterations=40, graph_lambda=0.01,
+                              magnitude_lambda=1e-4, knn=8, min_support=2,
+                              huber_delta=3.0):
+    """Joint CPU diagnostic with a source-graph relative-motion penalty.
+
+    This is intentionally a small Jacobi-style solver, not a replacement for
+    differentiable Stage 1. It validates whether observations contain enough
+    3D information before CUDA optimization is attempted.
+    """
+    base = recover_xyz_from_observations(
+        source_xyz, cameras, target_xy, visibility, confidence,
+        iterations=0, min_support=min_support, propagate=False,
+        huber_delta=huber_delta)
+    xyz = torch.as_tensor(source_xyz).float().cpu()
+    n = xyz.shape[0]
+    support = base["support_count"]
+    weights = torch.as_tensor(visibility).float().cpu()
+    if confidence is not None:
+        weights *= torch.as_tensor(confidence).float().cpu().clamp_min(0)
+    residual = base["reprojection_residual"]
+    jac = base["jacobians"]
+    normal = torch.zeros((n, 3, 3))
+    rhs = torch.zeros((n, 3))
+    for v in range(len(cameras)):
+        err = residual[v].norm(dim=-1)
+        robust = torch.where(err <= huber_delta, torch.ones_like(err), huber_delta / err.clamp_min(1e-6))
+        w = weights[v] * robust
+        normal += torch.einsum("n,nij,nik->njk", w, jac[v], jac[v])
+        rhs += torch.einsum("n,nij,ni->nj", w, jac[v], residual[v])
+    normal += magnitude_lambda * torch.eye(3).expand(n, 3, 3)
+    try:
+        from scipy.spatial import cKDTree
+        _, neighbors = cKDTree(xyz.numpy()).query(xyz.numpy(), k=min(knn + 1, n))
+        neighbors = np.asarray(neighbors)[:, 1:]
+    except Exception:
+        neighbors = np.tile(np.arange(n)[:, None], (1, 1))
+    delta = torch.zeros((n, 3))
+    degree = (neighbors >= 0).sum(1).astype(np.float32)
+    for _ in range(iterations):
+        new_delta = torch.zeros_like(delta)
+        for i in range(n):
+            nb = torch.from_numpy(neighbors[i][neighbors[i] >= 0]).long()
+            lhs = normal[i] + graph_lambda * float(degree[i]) * torch.eye(3)
+            local_rhs = rhs[i] + graph_lambda * delta[nb].sum(0) if len(nb) else rhs[i]
+            new_delta[i] = torch.linalg.solve(lhs + 1e-6 * torch.eye(3), local_rhs)
+        delta = new_delta
+    delta[support < min_support] = 0
+    return {"d_xyz": delta, "support_count": support,
+            "reprojection_residual": residual, "source_views": base["source_views"],
+            "jacobians": jac, "neighbors": torch.from_numpy(neighbors).long()}

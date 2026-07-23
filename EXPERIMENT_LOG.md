@@ -415,3 +415,45 @@ constraint contain a recoverable 3D teacher under this baseline. No GPU Stage 1
 run was possible because the NVIDIA driver remained unavailable. The image
 observation route is not rejected in principle, but the current matcher and
 visibility/observation quality are insufficient.
+
+## Shared Style / Template Nuisance Factorization (2026-07-23)
+
+The research interpretation was corrected: a generated ordinary target is a
+conditional template, not an exact pointwise pair. The controlled benchmark
+uses the existing fixed 44,764-Gaussian Graphdeco elephant bank and the hidden
+body-roundness teacher. Five candidates were constructed as shared style plus
+zero-centered moderate geometry nuisance; appearance nuisance was recorded in
+metadata only. No mesh, independent target 3D, scaling delta, or background
+motion was used.
+
+Command:
+
+```bash
+python scripts/run_template_factorization_benchmark.py \
+  --output_dir output/elephant_source_graphdeco/template_factorization_benchmark
+```
+
+The result is at
+`output/elephant_source_graphdeco/template_factorization_benchmark/factorization_summary.json`.
+The strongest nuisance-regression estimate achieved active cosine `1.0000`,
+energy ratio `1.0000`, explained variance `1.0000`, and nuisance leakage
+`0.000002`. The robust shared estimate achieved cosine `0.9990`, energy ratio
+`0.9011`, explained variance `0.9955`, and nuisance leakage `0.0668`. A single
+template was materially worse in energy (`0.4027`) and nuisance leakage
+(`0.3924`). One-outlier robust recovery remained cosine `0.9992`, energy
+`1.1078`, and explained variance `0.9955`; missing-region robustness remained
+cosine `0.9897`. Background energy was 0 and `d_scaling` was exactly zero.
+The controlled factorization gate passes, but this is not evidence of a real
+style delta.
+
+The CPU oracle observed-2D validation was run after the factorization code.
+Point recovery reached active cosine `0.9999996`, energy ratio `1.0023`, and
+explained variance `0.9999980`. The graph-coupled recovery reached active
+cosine `0.9999998`, energy ratio `1.0017`, and explained variance `0.9999989`.
+Both had zero background energy and exact-zero `d_scaling`. This validates the
+CPU diagnostic on oracle target projections; image-derived observations remain
+unvalidated for 3D recovery and CUDA is unavailable.
+
+The real pilot manifest was changed from three nominal repeats to three
+conditional template variants A/B/C. The folders remain empty and no target
+images were generated. Stage 2 and part compression remain paused.

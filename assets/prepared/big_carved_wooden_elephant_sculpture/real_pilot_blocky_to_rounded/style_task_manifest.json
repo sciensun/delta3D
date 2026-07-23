@@ -14,7 +14,7 @@
       "roundness": "increased"
     },
     "intensity": 0.5,
-    "repeat_id": "repeat_0",
+    "repeat_id": "template_A",
     "camera_names": [
       "0072_elev000_az000.png",
       "0081_elev000_az045.png",
@@ -26,8 +26,8 @@
       "0135_elev000_az315.png"
     ],
     "source_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset/images",
-    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/repeat_0/targets_key8",
-    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into a moderately rounded, less blocky version.\n\nPreserve the exact same camera viewpoint, crop, object identity, pose, trunk direction, ear placement, leg placement, body placement, base attachment, topology, and number of parts. Keep the same material, color, lighting, and background as far as possible. Reduce blockiness and faceting moderately and make the volumes smoother, more rounded, and anatomically coherent. Do not add or delete parts, change posture, change the camera, redesign the texture, or introduce unrelated realism changes. Output one centered object only with the same framing and no text or extra objects.\n",
+    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/template_A/targets_key8",
+    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into an ordinary or moderately rounded elephant template.\n\nPreserve the same camera viewpoint and compatible framing, elephant category, semantic parts, compatible topology, broadly compatible pose, trunk direction, ear/leg placement, base attachment, and number of major parts. Reduce blockiness and faceting moderately and make volumes smoother, more rounded, and anatomically coherent. Do not add or delete major parts, make an extreme pose change, change the camera, or introduce unrelated realism changes. Controlled variation in color, surface appearance, moderate body build, and moderate part proportions is allowed across template variants. Output one centered object only with the same framing and no text or extra objects.\n",
     "affected_parts": [
       "body surface",
       "body volume"
@@ -45,12 +45,16 @@
     "quality_control": {
       "required_complete_views": 8,
       "requires_manual_silhouette_check": true,
-      "requires_identity_check": true,
-      "repeat_is_independent": true
+      "requires_semantic_part_check": true,
+      "template_is_conditional_sample": true
     },
     "metadata": {
       "generation_status": "not_generated",
-      "observation_status": "not_extracted"
+      "observation_status": "not_extracted",
+      "template_variant": {
+        "appearance": "similar natural color",
+        "geometry": "medium body build"
+      }
     }
   },
   {
@@ -68,7 +72,7 @@
       "roundness": "increased"
     },
     "intensity": 0.5,
-    "repeat_id": "repeat_1",
+    "repeat_id": "template_B",
     "camera_names": [
       "0072_elev000_az000.png",
       "0081_elev000_az045.png",
@@ -80,8 +84,8 @@
       "0135_elev000_az315.png"
     ],
     "source_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset/images",
-    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/repeat_1/targets_key8",
-    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into a moderately rounded, less blocky version.\n\nPreserve the exact same camera viewpoint, crop, object identity, pose, trunk direction, ear placement, leg placement, body placement, base attachment, topology, and number of parts. Keep the same material, color, lighting, and background as far as possible. Reduce blockiness and faceting moderately and make the volumes smoother, more rounded, and anatomically coherent. Do not add or delete parts, change posture, change the camera, redesign the texture, or introduce unrelated realism changes. Output one centered object only with the same framing and no text or extra objects.\n",
+    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/template_B/targets_key8",
+    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into an ordinary or moderately rounded elephant template.\n\nPreserve the same camera viewpoint and compatible framing, elephant category, semantic parts, compatible topology, broadly compatible pose, trunk direction, ear/leg placement, base attachment, and number of major parts. Reduce blockiness and faceting moderately and make volumes smoother, more rounded, and anatomically coherent. Do not add or delete major parts, make an extreme pose change, change the camera, or introduce unrelated realism changes. Controlled variation in color, surface appearance, moderate body build, and moderate part proportions is allowed across template variants. Output one centered object only with the same framing and no text or extra objects.\n",
     "affected_parts": [
       "body surface",
       "body volume"
@@ -99,12 +103,16 @@
     "quality_control": {
       "required_complete_views": 8,
       "requires_manual_silhouette_check": true,
-      "requires_identity_check": true,
-      "repeat_is_independent": true
+      "requires_semantic_part_check": true,
+      "template_is_conditional_sample": true
     },
     "metadata": {
       "generation_status": "not_generated",
-      "observation_status": "not_extracted"
+      "observation_status": "not_extracted",
+      "template_variant": {
+        "appearance": "different natural color",
+        "geometry": "slightly heavier body"
+      }
     }
   },
   {
@@ -122,7 +130,7 @@
       "roundness": "increased"
     },
     "intensity": 0.5,
-    "repeat_id": "repeat_2",
+    "repeat_id": "template_C",
     "camera_names": [
       "0072_elev000_az000.png",
       "0081_elev000_az045.png",
@@ -134,8 +142,8 @@
       "0135_elev000_az315.png"
     ],
     "source_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset/images",
-    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/repeat_2/targets_key8",
-    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into a moderately rounded, less blocky version.\n\nPreserve the exact same camera viewpoint, crop, object identity, pose, trunk direction, ear placement, leg placement, body placement, base attachment, topology, and number of parts. Keep the same material, color, lighting, and background as far as possible. Reduce blockiness and faceting moderately and make the volumes smoother, more rounded, and anatomically coherent. Do not add or delete parts, change posture, change the camera, redesign the texture, or introduce unrelated realism changes. Output one centered object only with the same framing and no text or extra objects.\n",
+    "target_image_root": "assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/template_C/targets_key8",
+    "generation_prompt": "Convert this rendered stylized wooden elephant sculpture into an ordinary or moderately rounded elephant template.\n\nPreserve the same camera viewpoint and compatible framing, elephant category, semantic parts, compatible topology, broadly compatible pose, trunk direction, ear/leg placement, base attachment, and number of major parts. Reduce blockiness and faceting moderately and make volumes smoother, more rounded, and anatomically coherent. Do not add or delete major parts, make an extreme pose change, change the camera, or introduce unrelated realism changes. Controlled variation in color, surface appearance, moderate body build, and moderate part proportions is allowed across template variants. Output one centered object only with the same framing and no text or extra objects.\n",
     "affected_parts": [
       "body surface",
       "body volume"
@@ -153,12 +161,16 @@
     "quality_control": {
       "required_complete_views": 8,
       "requires_manual_silhouette_check": true,
-      "requires_identity_check": true,
-      "repeat_is_independent": true
+      "requires_semantic_part_check": true,
+      "template_is_conditional_sample": true
     },
     "metadata": {
       "generation_status": "not_generated",
-      "observation_status": "not_extracted"
+      "observation_status": "not_extracted",
+      "template_variant": {
+        "appearance": "different natural color",
+        "geometry": "slightly slimmer body and moderate ear variation"
+      }
     }
   }
 ]

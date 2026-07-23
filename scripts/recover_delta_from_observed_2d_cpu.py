@@ -7,7 +7,7 @@ import torch
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from correspondence.cpu_cameras import load_cpu_source_and_cameras
-from correspondence.cpu_recovery import recover_xyz_from_observations
+from correspondence.cpu_recovery import recover_xyz_from_observations, recover_xyz_graph_coupled
 from correspondence.schema import ObservationBundle
 
 
@@ -22,6 +22,9 @@ def main():
     p.add_argument("--min_support", type=int, default=2)
     p.add_argument("--no_propagate", action="store_true")
     p.add_argument("--mode", choices=["point", "silhouette", "hybrid"], default="point")
+    p.add_argument("--solver", choices=["point", "graph"], default="point")
+    p.add_argument("--graph_lambda", type=float, default=0.01)
+    p.add_argument("--graph_iterations", type=int, default=40)
     a = p.parse_args()
     bundle = ObservationBundle.load(a.bundle_path, device="cpu")
     if bundle.target_xyz is not None:
@@ -33,20 +36,28 @@ def main():
     point_visibility = bundle.visibility_2d if use_points else torch.zeros_like(bundle.visibility_2d)
     point_xy = bundle.target_xy if use_points else torch.zeros_like(bundle.target_xy)
     silhouette = bundle.silhouette_observations if a.mode in ("silhouette", "hybrid") else None
-    result = recover_xyz_from_observations(
-        source_xyz, selected, point_xy, point_visibility,
-        bundle.confidence_2d if use_points else None, iterations=a.iterations,
-        min_support=a.min_support, propagate=not a.no_propagate,
-        silhouette_observations=silhouette, silhouette_weight=1.0,
-        point_weight=1.0,
-    )
+    if a.solver == "graph" and a.mode == "point":
+        result = recover_xyz_graph_coupled(
+            source_xyz, selected, point_xy, point_visibility,
+            bundle.confidence_2d if use_points else None,
+            iterations=a.graph_iterations, graph_lambda=a.graph_lambda,
+            min_support=a.min_support)
+    else:
+        result = recover_xyz_from_observations(
+            source_xyz, selected, point_xy, point_visibility,
+            bundle.confidence_2d if use_points else None, iterations=a.iterations,
+            min_support=a.min_support, propagate=not a.no_propagate,
+            silhouette_observations=silhouette, silhouette_weight=1.0,
+            point_weight=1.0,
+        )
     d_scaling = torch.zeros_like(result["d_xyz"])
     payload = {"d_xyz": result["d_xyz"], "d_scaling": d_scaling,
                "source_xyz": source_xyz, "foreground_mask": result["support_count"] > 0,
                "support_count": result["support_count"],
                "metadata": {"method": "cpu_multiview_reprojection_irls",
                             "observation_mode": "observed_2d", "target_xyz_used": False,
-                            "min_support": a.min_support, "recovery_mode": a.mode, "background_delta_exact_zero": True,
+                            "min_support": a.min_support, "recovery_mode": a.mode, "solver": a.solver,
+                            "graph_lambda": a.graph_lambda, "background_delta_exact_zero": True,
                             "d_scaling_exact_zero": True}}
     os.makedirs(os.path.dirname(os.path.abspath(a.output_path)), exist_ok=True)
     torch.save(payload, a.output_path)

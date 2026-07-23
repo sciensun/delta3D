@@ -157,6 +157,34 @@ disabled.
 
 ## Reliability Definition
 
+## Target Templates and Shared Style
+
+The intended real target is a conventional template sampled from a target-style
+distribution. It need not be the same individual object or have identical
+color, material, body build, or local geometry. Required invariants are object
+category, compatible main parts/topology, broadly compatible pose, and known or
+approximately preserved views.
+
+For template variant `r`:
+
+```text
+candidate_delta[o,s,r] = instance_style_delta[o,s]
+                        + template_specific_delta[o,r]
+                        + observation_and_optimization_residual
+```
+
+Only a component stable across target templates is promoted to an instance-level
+style delta. A component shared across source objects is a future Stage 2
+style representation. Exact synthetic pairs remain diagnostics only. The
+independent content 3D route is optional reference data, not a required main
+stage or a source of Gaussian index correspondence.
+
+`TargetTemplateRecord` explicitly stores allowed variations, forbidden changes,
+style attributes, nuisance attributes, view relation, and quality metadata.
+`stage1/template_factorization.py` compares single-template, mean, median,
+geometric-median, robust, and nuisance-regression estimators. It does not use
+image loss and does not enable scaling or background motion.
+
 For each `(object, style_operation, intensity, repeat, view)` task:
 
 ```text

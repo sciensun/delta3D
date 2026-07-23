@@ -91,6 +91,38 @@ docs/UPSTREAM_README.md           preserved upstream documentation
 
 ## Current Validation
 
+### Shared style versus template nuisance
+
+**Implemented and CPU-validated:** `stage1/template_factorization.py` and
+`scripts/run_template_factorization_benchmark.py` construct five controlled
+target-template candidates on the fixed Graphdeco elephant bank. Each is the
+same hidden body-roundness style teacher plus a recorded, zero-centered,
+topology-preserving nuisance delta. Appearance-only nuisance is represented in
+metadata and does not create geometry.
+
+The benchmark is intentionally separate from image matching. It tests whether
+multiple weak target templates can be reduced to a shared instance-style
+component without treating a single candidate as style. The best controlled
+result was nuisance regression with active cosine `1.0000`, explained variance
+`1.0000`, nuisance leakage below `0.00001`, and zero background/scale delta.
+The robust shared estimator reached cosine `0.9990`, explained variance
+`0.9955`, and energy ratio `0.9011`; a single template reached cosine `0.9839`
+but energy ratio only `0.4027` and nuisance leakage `0.3924`. These are exact
+controlled deltas, not real target or style-transfer results.
+
+The prepared real pilot now uses three conditional target-template variants:
+`template_A` (similar color, medium build), `template_B` (different natural
+color, slightly heavier build), and `template_C` (different color, slimmer
+build with moderate ear variation). Their folders are intentionally empty.
+`TargetTemplateRecord` records allowed variation, required invariants, and
+nuisance attributes while remaining compatible with `StyleTaskRecord`.
+
+The CPU oracle observed-2D diagnostic was also validated: point recovery and
+the new graph-coupled solver both reached active cosine above `0.999999`, energy
+ratio about `1.002`, explained variance above `0.999998`, with zero background
+energy and exact-zero `d_scaling`. This validates the solver on oracle
+observations only; it does not validate image-derived matching.
+
 ### Validated synthetic fixed-bank recovery
 
 The body-roundness known-delta benchmark recovered a controlled xyz-only delta:
