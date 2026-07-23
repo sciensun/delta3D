@@ -50,4 +50,6 @@ conditional samples and evaluate them as a distribution.
 `output/elephant_source_graphdeco/template_factorization_benchmark/`
 `assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/target_template_manifest.json`
 
-Commit SHA is recorded in the final cdx report after the commit is created.
+Implementation commit SHA: `ba20e5ed518dc09bd83fd949e36fd6155bfe98a9`.
+This handoff metadata is finalized by the follow-up metadata commit reported
+by cdx; the implementation commit above contains the research changes.
