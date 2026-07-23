@@ -2,6 +2,8 @@ import torch
 
 from correspondence.sparse_sampling import fixed_views_per_track, observability_report, track_dropout
 from correspondence.control_graph import interpolation_weights
+from correspondence.cpu_recovery import solve_symmetric_graph
+from correspondence.benchmark_artifacts import upsert_records, validate_records
 
 
 def test_track_sampling_and_support_counts():
@@ -24,3 +26,24 @@ def test_control_interpolation_partition_of_unity():
     idx, weights = interpolation_weights(xyz, controls, mask, neighbors=3)
     assert torch.allclose(weights[mask].sum(1), torch.ones(int(mask.sum())))
     assert torch.equal(weights[~mask], torch.zeros_like(weights[~mask]))
+
+
+def test_symmetric_global_graph_solver_matches_small_quadratic():
+    edges = torch.tensor([[0, 1], [1, 2], [2, 3]])
+    weights = torch.ones(3)
+    rhs = torch.arange(4, dtype=torch.float32)[:, None]
+    solved, info = solve_symmetric_graph(rhs, torch.ones(4), edges, weights,
+                                         graph_lambda=0.2)
+    assert info["cg_info"] == [0]
+    # Constant RHS remains close to constant under a Laplacian; this also
+    # checks that each undirected edge is assembled exactly once.
+    constant, _ = solve_symmetric_graph(torch.ones(4, 1), torch.ones(4), edges, weights,
+                                        graph_lambda=0.2)
+    assert torch.allclose(constant, torch.ones(4, 1), atol=1e-4)
+
+
+def test_benchmark_records_replace_duplicate_keys():
+    a = {"teacher": "body", "mode": "track", "fraction": .2, "seed": 1}
+    merged = upsert_records([dict(a, value=1)], [dict(a, value=2)])
+    assert len(merged) == 1 and merged[0]["value"] == 2
+    assert validate_records(merged)["unique"] == 1

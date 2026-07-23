@@ -48,5 +48,5 @@ next experiment should complete five-seed track-aware validation and add
 silhouette/boundary observations. No real target images were
 generated and no style-transfer claim is made.
 
-Implementation commit SHA: `4866c07`.
+Track-aware implementation baseline: `a192585`.
 Final HEAD is reported separately to avoid recursive metadata commits.

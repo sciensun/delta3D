@@ -606,3 +606,18 @@ cosine `1.0` for all teachers and full active cosine body/ear/trunk of
 `0.4`. A 64-control translation graph gives `0.938/0.942/0.908` for
 body/ear/trunk at `0.2`. This is promising but not a five-seed acceptance gate.
 Silhouette-only and track-plus-silhouette were not run in this iteration.
+
+The deduplicated clean primary artifact contains 15 unique records for
+track-dropout fraction `0.20`. Active cosine mean/std/min/max are body
+`0.899/0.002/0.897/0.904`, ear `0.889/0.007/0.879/0.898`, and trunk
+`0.871/0.012/0.849/0.882`. The exact-K support report distinguishes K=2 and
+K=3: at fraction `0.20`, K=2 has about `0.199` foreground tracks with >=2
+views, while K=3 has about `0.199` tracks with >=3 views.
+
+Camera centers are recovered from the inverse row-vector world-view transform
+and baseline selection is explicit. The small CPU PCG test matches the
+undirected Laplacian objective; no full-bank PCG-vs-Jacobi timing comparison is
+claimed. Hidden-GT control ceilings are body
+`0.925/0.939/0.949/0.962`, ear `0.918/0.947/0.951/0.969`, and trunk
+`0.818/0.913/0.933/0.939` for M=`32/64/128/256`. Noise/outlier, silhouette,
+and full robust-gate branches remain incomplete.

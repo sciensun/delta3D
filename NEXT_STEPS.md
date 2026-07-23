@@ -47,6 +47,13 @@ cosine body/ear/trunk is `0.898/0.880/0.881` at `0.2` and
 five-seed acceptance gate. The next active experiment is five-seed track-aware
 validation plus silhouette/boundary observations.
 
+The deduplicated five-seed clean track-dropout artifact contains 15 unique
+records at fraction `0.20`. Active cosine mean/std/min/max are body
+`0.899/0.002/0.897/0.904`, ear `0.889/0.007/0.879/0.898`, and trunk
+`0.871/0.012/0.849/0.882`. Anchor cosine is `1.0` in these clean oracle
+runs. This is promising but not the robust gate: baseline-conditioned K-view,
+noise, outlier, and silhouette branches are still pending.
+
 ## Real Pilot Layout
 
 Expand the empty layout to `sample_A` through `sample_E`, each with the same

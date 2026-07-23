@@ -6,6 +6,34 @@ import time
 from .gaussian_visibility import project_points
 
 
+def graph_energy(delta, edge_index, edge_weights):
+    d = torch.as_tensor(delta).float(); e = torch.as_tensor(edge_index).long()
+    return float((torch.as_tensor(edge_weights).float() * (d[e[:, 0]] - d[e[:, 1]]).square().sum(1)).sum())
+
+
+def solve_symmetric_graph(rhs, diagonal, edge_index, edge_weights, graph_lambda=0.01,
+                         maxiter=200, tol=1e-5):
+    """Solve (diag + lambda L) x = rhs with scipy PCG, one xyz column at a time."""
+    import numpy as np
+    from scipy.sparse.linalg import LinearOperator, cg
+    b = torch.as_tensor(rhs).float().cpu(); diag = torch.as_tensor(diagonal).float().cpu()
+    e = torch.as_tensor(edge_index).long().cpu().numpy(); w = torch.as_tensor(edge_weights).float().cpu().numpy()
+    n = len(diag); degree = np.zeros(n, dtype=np.float64)
+    np.add.at(degree, e[:, 0], w); np.add.at(degree, e[:, 1], w)
+    def matvec(x):
+        y = diag.numpy() * x
+        diff = x[e[:, 0]] - x[e[:, 1]]
+        np.add.at(y, e[:, 0], graph_lambda * w * diff)
+        np.add.at(y, e[:, 1], -graph_lambda * w * diff)
+        return y
+    op = LinearOperator((n, n), matvec=matvec, dtype=np.float64)
+    out = np.zeros((n, b.shape[1]), dtype=np.float32); info=[]
+    for c in range(b.shape[1]):
+        sol, code = cg(op, b[:, c].numpy().astype(np.float64), maxiter=maxiter, tol=tol)
+        out[:, c] = torch.from_numpy(sol).float(); info.append(int(code))
+    return torch.from_numpy(out), {"cg_info": info, "maxiter": maxiter, "tol": tol}
+
+
 def _project_with_jacobian(xyz, cameras, jacobian_eps=1e-3):
     source_views, jacobians = [], []
     for camera in cameras:
@@ -52,9 +80,29 @@ def build_geometry_cache(source_xyz, cameras, knn=8, jacobian_eps=1e-3):
     graph_weights = 1.0 / distance
     graph_weights[neighbors == torch.arange(len(xyz))[:, None]] = 0.0
     graph_weights = graph_weights / graph_weights.sum(1, keepdim=True).clamp_min(1e-8)
+    edge_pairs = set()
+    for i in range(len(xyz)):
+        for j in neighbors[i].tolist():
+            if i != int(j): edge_pairs.add(tuple(sorted((i, int(j)))))
+    edge_index = torch.tensor(sorted(edge_pairs), dtype=torch.long)
+    edge_distance = (xyz[edge_index[:, 0]] - xyz[edge_index[:, 1]]).norm(dim=1).clamp_min(1e-6)
+    edge_weights = 1.0 / edge_distance
+    try:
+        from scipy.sparse import coo_matrix
+        from scipy.sparse.csgraph import connected_components
+        rows = edge_index[:, 0].numpy(); cols = edge_index[:, 1].numpy()
+        graph = coo_matrix((np.ones(len(rows) * 2), (np.r_[rows, cols], np.r_[cols, rows])), shape=(len(xyz), len(xyz))).tocsr()
+        components, labels = connected_components(graph, directed=False)
+        sizes = np.bincount(labels)
+        graph_diag = {"components": int(components), "isolated_vertices": int((sizes == 1).sum()),
+                      "largest_component": int(sizes.max()), "smallest_component": int(sizes.min())}
+    except Exception:
+        graph_diag = {"components": None, "isolated_vertices": None}
     return {"source_xyz": xyz, "source_views": source_views,
             "jacobians": jacobians, "neighbors": neighbors, "graph_weights": graph_weights,
             "degree": torch.ones((len(xyz),), dtype=torch.float32),
+            "edge_index": edge_index, "edge_weights": edge_weights,
+            "graph_diagnostics": graph_diag,
             "cameras": cameras, "jacobian_eps": jacobian_eps,
             "knn": int(neighbors.shape[1]), "graph_type": "symmetric_mutual_knn",
             "cache_build_seconds": time.perf_counter() - started}

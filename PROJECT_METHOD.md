@@ -258,3 +258,8 @@ Gaussian across its valid views and is not per-view observation retention. The
 symmetric mutual-KNN graph and low-dimensional control-node translation prior
 are implemented. Control interpolation preserves partition of unity and keeps
 background/frozen Gaussian motion exactly zero.
+
+The explicit graph edge list stores each undirected edge once and exposes a
+matrix-free symmetric Laplacian energy plus a CPU PCG solve. The current full
+research gate still uses the IRLS recovery path; PCG has only passed the small
+quadratic equivalence test in this iteration.
