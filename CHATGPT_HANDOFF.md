@@ -36,5 +36,6 @@ unimplemented.
 Use five identical-condition standardized target samples for the first real
 pilot. Generate and evaluate them in the next iteration, not this one.
 
-Implementation commit SHA: to be recorded after commit.
-This handoff belongs to the final commit reported by cdx.
+Implementation commit SHA: `d27b8cae395cb890c5369638b49d80e7415ca535`.
+This handoff belongs to the final commit reported by cdx; the final HEAD is
+reported separately to avoid recursive SHA metadata commits.
