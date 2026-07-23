@@ -1,55 +1,39 @@
-# ChatGPT Handoff: Shared Style / Template Nuisance Factorization
+# ChatGPT Handoff: Stochastic Target-Template Factorization
 
 ## Status
 
-**PARTIAL, controlled benchmark PASS.** No real style delta or Stage 2 model
-was produced.
-
-## Objective
-
-Treat generated ordinary targets as conditional target-template samples rather
-than exact pointwise object pairs. Estimate a shared instance-style component
-from multiple candidate deltas while retaining template-specific nuisance.
+**PARTIAL.** The v1 sanity-test interpretation was corrected and v2 stochastic
+factorization passed at low/moderate nuisance for R=5/8, but recovered-candidate
+full-bank validation remains incomplete. Stage 2 was not started.
 
 ## Changes
 
-- Added `TargetTemplateRecord` with backward-compatible `StyleTaskRecord`
-  loading.
-- Added `stage1/template_factorization.py` with mean, median, geometric median,
-  robust shared, and nuisance-regression estimators.
-- Added the controlled five-template benchmark script and artifacts.
-- Added graph-coupled CPU oracle observed-2D recovery.
-- Changed the prepared elephant pilot from nominal repeats to empty conditional
-  templates A/B/C with explicit allowed variations and invariants.
-- Rewrote `NEXT_STEPS.md` so only the factorization/oracle decision is active.
+- Corrected distinct global/foreground/active metric regions and labels.
+- Normalized robust trimming by valid confidence.
+- Added v2 random independent nuisance benchmark for R=3/5/8 and three seeds.
+- Added biased-nuisance identifiability failure case.
+- Added recovered oracle observed-2D candidate factorization diagnostic.
+- Corrected real pilot to three identical standardized prompts with null
+  pre-generation nuisance fields.
 
-## Validation
+## Results
 
-Controlled body-roundness factorization: nuisance regression active cosine
-`1.0000`, explained variance `1.0000`, leakage `<0.00001`; robust shared cosine
-`0.9990`, energy `0.9011`; one-template energy `0.4027`. The CPU oracle
-observed-2D graph solver reached active cosine `0.9999998`, energy `1.0017`,
-explained variance `0.9999989`. Background energy was zero and `d_scaling` was
-exactly zero. CPU tests and syntax checks passed. CUDA was unavailable.
+No-label robust active cosine / explained variance:
+`R5, nuisance .25 = .935/.854`; `R8, nuisance .25 = .972/.941`;
+`R5, nuisance .5 = .788/.415`; `R8, nuisance .5 = .896/.767`.
+Sampled recovered-oracle diagnostic: cosine `.901`, energy `.670`, explained
+variance `.802`, versus single candidate cosine `.656`.
 
-## Limitation and Decision
+## Limitation
 
-The controlled decomposition is validated, but it does not establish that real
-generated target images contain a stable style component. Do not start Stage 2,
-part compression, or real target generation until oracle-candidate
-factorization and quality control are reviewed.
+The full-bank recovered-candidate CPU loop was memory-unstable; the reported
+recovered result evaluates 4,096 active Gaussians. No real target images,
+CUDA run, cross-object style representation, or Stage 2 model exists.
 
-## Next Experiment
+## Decision
 
-Apply the factorization to multiple oracle observed-2D recovered candidates,
-then fill the three prepared target-template folders with real multi-view
-conditional samples and evaluate them as a distribution.
+Keep Stage 2 paused. Complete full-bank/documented sampled recovered-candidate
+validation before the three-sample real pilot.
 
-## Artifacts
-
-`output/elephant_source_graphdeco/template_factorization_benchmark/`
-`assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/target_template_manifest.json`
-
-Implementation commit SHA: `ba20e5ed518dc09bd83fd949e36fd6155bfe98a9`.
-This handoff metadata is finalized by the follow-up metadata commit reported
-by cdx; the implementation commit above contains the research changes.
+Implementation commit SHA: to be recorded after commit.
+Final metadata commit SHA: to be recorded after metadata commit.

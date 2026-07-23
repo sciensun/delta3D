@@ -1,24 +1,17 @@
 [
   {
-    "target_template_id": "big_carved_wooden_elephant_sculpture:template_A",
+    "target_template_id": "big_carved_wooden_elephant_sculpture:sample_A",
     "target_style_family": "blocky_to_rounded",
     "style_operation": "blocky_to_rounded",
     "style_intensity": 0.5,
-    "template_variant_id": "template_A",
+    "template_variant_id": "sample_A",
     "target_style_attributes": {
       "blockiness": "moderately reduced",
       "roundness": "increased"
     },
-    "template_nuisance_attributes": {
-      "appearance": "similar natural color",
-      "geometry": "medium body build"
-    },
-    "appearance_nuisance_attributes": {
-      "allowed": "controlled color/surface variation"
-    },
-    "geometry_nuisance_attributes": {
-      "allowed": "moderate body/part proportion variation"
-    },
+    "template_nuisance_attributes": {},
+    "appearance_nuisance_attributes": null,
+    "geometry_nuisance_attributes": null,
     "required_invariants": [
       "elephant category",
       "main parts",
@@ -68,25 +61,18 @@
     "object_id": "big_carved_wooden_elephant_sculpture"
   },
   {
-    "target_template_id": "big_carved_wooden_elephant_sculpture:template_B",
+    "target_template_id": "big_carved_wooden_elephant_sculpture:sample_B",
     "target_style_family": "blocky_to_rounded",
     "style_operation": "blocky_to_rounded",
     "style_intensity": 0.5,
-    "template_variant_id": "template_B",
+    "template_variant_id": "sample_B",
     "target_style_attributes": {
       "blockiness": "moderately reduced",
       "roundness": "increased"
     },
-    "template_nuisance_attributes": {
-      "appearance": "different natural color",
-      "geometry": "slightly heavier body"
-    },
-    "appearance_nuisance_attributes": {
-      "allowed": "controlled color/surface variation"
-    },
-    "geometry_nuisance_attributes": {
-      "allowed": "moderate body/part proportion variation"
-    },
+    "template_nuisance_attributes": {},
+    "appearance_nuisance_attributes": null,
+    "geometry_nuisance_attributes": null,
     "required_invariants": [
       "elephant category",
       "main parts",
@@ -136,25 +122,18 @@
     "object_id": "big_carved_wooden_elephant_sculpture"
   },
   {
-    "target_template_id": "big_carved_wooden_elephant_sculpture:template_C",
+    "target_template_id": "big_carved_wooden_elephant_sculpture:sample_C",
     "target_style_family": "blocky_to_rounded",
     "style_operation": "blocky_to_rounded",
     "style_intensity": 0.5,
-    "template_variant_id": "template_C",
+    "template_variant_id": "sample_C",
     "target_style_attributes": {
       "blockiness": "moderately reduced",
       "roundness": "increased"
     },
-    "template_nuisance_attributes": {
-      "appearance": "different natural color",
-      "geometry": "slightly slimmer body and moderate ear variation"
-    },
-    "appearance_nuisance_attributes": {
-      "allowed": "controlled color/surface variation"
-    },
-    "geometry_nuisance_attributes": {
-      "allowed": "moderate body/part proportion variation"
-    },
+    "template_nuisance_attributes": {},
+    "appearance_nuisance_attributes": null,
+    "geometry_nuisance_attributes": null,
     "required_invariants": [
       "elephant category",
       "main parts",

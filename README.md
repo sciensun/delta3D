@@ -93,27 +93,38 @@ docs/UPSTREAM_README.md           preserved upstream documentation
 
 ### Shared style versus template nuisance
 
-**Implemented and CPU-validated:** `stage1/template_factorization.py` and
-`scripts/run_template_factorization_benchmark.py` construct five controlled
-target-template candidates on the fixed Graphdeco elephant bank. Each is the
-same hidden body-roundness style teacher plus a recorded, zero-centered,
-topology-preserving nuisance delta. Appearance-only nuisance is represented in
-metadata and does not create geometry.
+**Implemented:** `stage1/template_factorization.py` and
+`scripts/run_template_factorization_benchmark.py` are a controlled
+implementation sanity check. Its finite nuisance coefficients are exactly
+symmetric/zero-centered, its nuisance labels are synthetic oracle inputs, and
+the intercept-plus-feature regression is exactly determined. The old compact
+and radial construction was also linearly dependent. It remains a regression
+test, not evidence for a nontrivial factorization.
+
+**Partially validated:** `scripts/run_template_factorization_benchmark_v2.py`
+uses independently sampled non-exact finite-sample nuisance coefficients,
+independent smooth spatial bases, R=`3/5/8`, nuisance strength `0.25/0.5/1.0`,
+three seeds, recovery noise, outliers, confidence imbalance, missing regions,
+and a biased-nuisance identifiability case. Primary no-label methods do not
+receive nuisance coefficients. Oracle-label regression is an upper bound only.
 
 The benchmark is intentionally separate from image matching. It tests whether
 multiple weak target templates can be reduced to a shared instance-style
 component without treating a single candidate as style. The best controlled
-result was nuisance regression with active cosine `1.0000`, explained variance
-`1.0000`, nuisance leakage below `0.00001`, and zero background/scale delta.
-The robust shared estimator reached cosine `0.9990`, explained variance
-`0.9955`, and energy ratio `0.9011`; a single template reached cosine `0.9839`
-but energy ratio only `0.4027` and nuisance leakage `0.3924`. These are exact
-controlled deltas, not real target or style-transfer results.
+The v1 sanity test reached near-perfect nuisance regression by construction.
+For v2, the no-label robust shared estimator at nuisance `0.25` and R=`5`
+achieved active cosine `0.935 +/- 0.036`, explained variance `0.854 +/- 0.092`,
+and nuisance leakage `0.144 +/- 0.091`; R=`8` reached `0.972 +/- 0.009` cosine
+and `0.941 +/- 0.016` explained variance. At nuisance `0.5`, R=`5` failed the
+provisional gate (`0.788` cosine), while R=`8` was borderline (`0.896`, `0.767`
+explained variance). A biased target-template mean is explicitly not
+identifiable from one source without a prior, labels, or multiple sources.
+These are controlled deltas, not real target or style-transfer results.
 
 The prepared real pilot now uses three conditional target-template variants:
-`template_A` (similar color, medium build), `template_B` (different natural
-color, slightly heavier build), and `template_C` (different color, slimmer
-build with moderate ear variation). Their folders are intentionally empty.
+`sample_A`, `sample_B`, and `sample_C`, all using the same standardized prompt.
+Their folders are intentionally empty; natural post-generation nuisance is
+recorded only after images exist.
 `TargetTemplateRecord` records allowed variation, required invariants, and
 nuisance attributes while remaining compatible with `StyleTaskRecord`.
 

@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 
 
-PROMPT = """Convert this rendered stylized wooden elephant sculpture into an ordinary or moderately rounded elephant template.
+PROMPT = """Convert this rendered stylized wooden elephant sculpture into a standard, typical, ordinary elephant sculpture.
 
-Preserve the same camera viewpoint and compatible framing, elephant category, semantic parts, compatible topology, broadly compatible pose, trunk direction, ear/leg placement, base attachment, and number of major parts. Reduce blockiness and faceting moderately and make volumes smoother, more rounded, and anatomically coherent. Do not add or delete major parts, make an extreme pose change, change the camera, or introduce unrelated realism changes. Controlled variation in color, surface appearance, moderate body build, and moderate part proportions is allowed across template variants. Output one centered object only with the same framing and no text or extra objects.
+Preserve the exact requested camera/view and compatible framing, elephant category, corresponding semantic parts, compatible topology and number of major parts, and broadly compatible pose. Keep the trunk direction, ear/leg placement, base attachment, and overall object arrangement compatible. Reduce blockiness and faceting moderately and make volumes smoother, more rounded, and anatomically coherent. Do not add or delete major parts, make an extreme pose change, change the camera, or introduce unrelated stylization. Aim to preserve body build, ear proportions, trunk proportions, limb proportions, overall coloration, and surface appearance where possible. Minor natural generation variation is acceptable. Output one centered object only with the same framing and no text or extra objects.
 """
 
 
@@ -20,17 +20,11 @@ def main():
     a = p.parse_args()
     root = Path(a.root) / "real_pilot_blocky_to_rounded"
     names = sorted(p.name for p in Path(a.source_image_root).glob("*.png"))
-    target_names = ["template_A", "template_B", "template_C"]
-    variant_notes = {
-        "template_A": {"appearance": "similar natural color", "geometry": "medium body build"},
-        "template_B": {"appearance": "different natural color", "geometry": "slightly heavier body"},
-        "template_C": {"appearance": "different natural color", "geometry": "slightly slimmer body and moderate ear variation"},
-    }
+    target_names = ["sample_A", "sample_B", "sample_C"]
     records = []
     for repeat in target_names:
         target_root = root / repeat / "targets_key8"
         target_root.mkdir(parents=True, exist_ok=True)
-        notes = variant_notes[repeat]
         records.append({
             "object_id": "big_carved_wooden_elephant_sculpture",
             "object_category": "wooden elephant sculpture",
@@ -50,7 +44,10 @@ def main():
             "quality_control": {"required_complete_views": len(names), "requires_manual_silhouette_check": True,
                                  "requires_semantic_part_check": True, "template_is_conditional_sample": True},
             "metadata": {"generation_status": "not_generated", "observation_status": "not_extracted",
-                         "template_variant": notes},
+                         "generation_condition": "same_standardized_prompt",
+                         "observed_appearance_attributes": None,
+                         "observed_geometry_attributes": None,
+                         "posthoc_nuisance_labels": None},
         })
     root.mkdir(parents=True, exist_ok=True)
     (root / "style_task_manifest.json").write_text(json.dumps(records, indent=2), encoding="utf-8")
@@ -61,9 +58,9 @@ def main():
             "target_style_family": record["style_family"], "style_operation": "blocky_to_rounded",
             "style_intensity": record["intensity"], "template_variant_id": record["repeat_id"],
             "target_style_attributes": record["target_attributes"],
-            "template_nuisance_attributes": record["metadata"]["template_variant"],
-            "appearance_nuisance_attributes": {"allowed": "controlled color/surface variation"},
-            "geometry_nuisance_attributes": {"allowed": "moderate body/part proportion variation"},
+            "template_nuisance_attributes": {},
+            "appearance_nuisance_attributes": None,
+            "geometry_nuisance_attributes": None,
             "required_invariants": ["elephant category", "main parts", "compatible topology", "broad pose", "camera/view"],
             "allowed_variations": ["color", "surface appearance", "moderate body build", "moderate part proportions"],
             "forbidden_changes": ["added/deleted major parts", "extreme pose change", "camera change"],

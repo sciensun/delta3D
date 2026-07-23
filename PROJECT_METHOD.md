@@ -185,6 +185,16 @@ style attributes, nuisance attributes, view relation, and quality metadata.
 geometric-median, robust, and nuisance-regression estimators. It does not use
 image loss and does not enable scaling or background motion.
 
+There are two levels of the style claim:
+
+1. **Instance-stable style delta:** a component stable across standardized
+   target samples for one source object.
+2. **Cross-object style representation:** a deformation rule shared across
+   multiple source objects and conditioned on their local geometry.
+
+Only the second level supports a style-transfer claim. No single-object result
+in this repository has reached that claim.
+
 For each `(object, style_operation, intensity, repeat, view)` task:
 
 ```text

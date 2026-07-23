@@ -457,3 +457,52 @@ unvalidated for 3D recovery and CUDA is unavailable.
 The real pilot manifest was changed from three nominal repeats to three
 conditional template variants A/B/C. The folders remain empty and no target
 images were generated. Stage 2 and part compression remain paused.
+
+## Stochastic Template Factorization v2 (2026-07-23)
+
+The v1 benchmark is now classified as a controlled implementation sanity
+check. Its five nuisance coefficients were exactly symmetric and zero-centered,
+the oracle coefficients were supplied to regression, R=5 with intercept plus
+four features was exactly determined, and its compact/radial bases were
+dependent. Its near-perfect result must not be presented as nontrivial
+factorization validation.
+
+The v2 benchmark was run with the fixed Graphdeco bank, body-roundness shared
+teacher, independently sampled nuisance coefficients, six independent smooth
+spatial nuisance bases, recovery-like noise, R=`3/5/8`, strengths
+`0.25/0.5/1.0`, and seeds `11/29/47`. Primary no-label methods did not see
+nuisance coefficients. Exact-label regression is marked upper bound and weak
+labels are noisy/discretized/partly missing.
+
+Artifact:
+`output/elephant_source_graphdeco/template_factorization_benchmark_v2/benchmark_v2_summary.json`.
+
+Selected no-label robust results (mean +/- std across seeds):
+
+| nuisance | R | active cosine | explained variance | nuisance leakage |
+|---:|---:|---:|---:|---:|
+| 0.25 | 3 | 0.906 +/- 0.067 | 0.716 +/- 0.152 | 0.279 +/- 0.149 |
+| 0.25 | 5 | 0.935 +/- 0.036 | 0.854 +/- 0.092 | 0.144 +/- 0.091 |
+| 0.25 | 8 | 0.972 +/- 0.009 | 0.941 +/- 0.016 | 0.058 +/- 0.016 |
+| 0.50 | 5 | 0.788 +/- 0.081 | 0.415 +/- 0.371 | 0.575 +/- 0.365 |
+| 0.50 | 8 | 0.896 +/- 0.037 | 0.767 +/- 0.063 | 0.229 +/- 0.062 |
+
+At moderate nuisance strength `0.25`, R=5/8 passes the provisional exact
+candidate gate; R=3 is mixed. At strength `0.5`, R=5 fails and R=8 is
+borderline. A deliberate nonzero shared nuisance bias produced a mean active
+cosine `0.950` but is not identifiable as style versus systematic target bias
+from one source without an additional prior, labels, or multiple source
+objects. This failure is documented, not corrected by hidden information.
+
+The saved oracle observed-2D candidate bundles contain `target_xyz=None`.
+The full five-candidate recovery loop was memory-unstable on this CPU, so a
+separate 4,096-active-Gaussian diagnostic was run with the graph-coupled CPU
+solver. Recovered factorization achieved mean cosine `0.901`, energy `0.670`,
+and explained variance `0.802`, versus a single recovered candidate cosine
+`0.656`, energy `1.817`, and explained variance `-0.065`. This is a partial
+recovered-candidate validation, not a full-bank acceptance result.
+
+The real pilot now has `sample_A`, `sample_B`, and `sample_C`, all using the
+same standardized prompt. Pre-generation observed nuisance fields are null;
+the samples are independent conditional generations, not deliberately heavy,
+slim, or large-ear variants. No real images were generated.

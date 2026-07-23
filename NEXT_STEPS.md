@@ -2,41 +2,31 @@
 
 ## Active Decision
 
-Do not start Stage 2, real style training, or part compression. First validate
-the controlled shared-style/template-nuisance factorization and the CPU
-graph-coupled oracle recovery already added in this iteration.
+Do not start Stage 2 or generate real targets yet. The stochastic benchmark
+shows that no-label shared-style extraction is viable at moderate nuisance
+with enough samples, but it is not reliable at stronger nuisance with only
+three to five samples. The recovered oracle-2D diagnostic is only partial
+because the full-bank CPU loop was memory-unstable.
 
-The current conceptual model is:
+Next, improve the recovered-candidate evaluation to a full-bank or documented
+larger sampled run, then decide whether the initial real pilot needs three or
+five standardized target samples. Do not use exact nuisance labels as the
+primary method and do not interpret the biased-nuisance case as identifiable.
 
-```text
-candidate_delta[o,s,r] = instance_style_delta[o,s]
-                        + template_specific_delta[o,r]
-                        + residual
-```
+## Gates
 
-The immediate active experiment is to inspect
-`output/elephant_source_graphdeco/template_factorization_benchmark/factorization_summary.json`,
-then validate the same factorization on oracle observed-2D recovered candidates.
-Only after that should the three empty real target-template folders be filled
-with actual images.
+- exact candidates: no-label active cosine >= 0.90, explained variance >= 0.80,
+  nuisance leakage <= 0.20;
+- recovered oracle candidates: active cosine >= 0.85, explained variance >=
+  0.65, and improvement over a single recovered candidate;
+- background delta exactly zero and `d_scaling` exactly zero;
+- no Stage 2 or style-transfer claim from one source object.
 
-## Current Gates
+## Real Pilot Layout
 
-- background delta must be exactly zero;
-- `d_scaling` must be exactly zero;
-- moderate-nuisance shared active cosine should be at least `0.90`;
-- explained variance should be at least `0.80`;
-- nuisance leakage should be at most `0.20`;
-- the CPU solver must pass its oracle observed-2D regression before image-derived
-  recovery is interpreted.
-
-## Prepared Real Pilot
-
-The empty conditional-template manifest is at:
-`assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/target_template_manifest.json`.
-It defines `template_A`, `template_B`, and `template_C` at intensity `0.5`.
-They are target-template variants, not repeated identical generations. No
-target images have been generated or fabricated.
-
-Stage 2 remains paused until shared-style stability is demonstrated across
-template variants and real observations pass quality control.
+`assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/`
+contains `sample_A`, `sample_B`, and `sample_C`. All use the same standardized
+prompt and eight cameras. The folders are empty. Any observed color, texture,
+body, ear, trunk, or limb nuisance will be recorded post-generation rather
+than prescribed beforehand. Expand to five samples only if three-sample
+stability is insufficient.

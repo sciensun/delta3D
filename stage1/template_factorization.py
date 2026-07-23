@@ -47,7 +47,9 @@ def robust_shared(deltas, confidence=None, trim_fraction=0.2, iterations=8):
     keep_count = max(1, int(round(deltas.shape[0] * (1.0 - trim_fraction))))
     for _ in range(iterations):
         residual = (deltas - estimate[None]).norm(dim=-1)
-        score = (residual * w).mean(dim=1)
+        # Normalize by valid confidence. Otherwise a low-confidence template
+        # can appear artificially close simply because it contributes less.
+        score = (residual * w).sum(dim=1) / w.sum(dim=1).clamp_min(1e-8)
         keep = torch.zeros_like(score, dtype=torch.bool)
         keep[torch.argsort(score)[:keep_count]] = True
         masked = w * keep[:, None].float()
@@ -83,29 +85,55 @@ def _safe_corr(a, b):
     return float(torch.corrcoef(torch.stack([a, b]))[0, 1])
 
 
-def delta_metrics(pred, target, active_mask=None, source_xyz=None):
-    pred = torch.as_tensor(pred).float()
-    target = torch.as_tensor(target).float()
-    mask = torch.ones(pred.shape[0], dtype=torch.bool) if active_mask is None else torch.as_tensor(active_mask).bool()
+def _region_metrics(pred, target, mask):
+    mask = torch.as_tensor(mask).bool()
+    if not bool(mask.any()):
+        return {"count": 0, "cosine": 0.0, "energy_ratio": 0.0,
+                "explained_variance": 0.0, "magnitude_pearson": 0.0,
+                "magnitude_spearman": 0.0}
     p, t = pred[mask], target[mask]
     diff = p - t
-    cosine = torch.nn.functional.cosine_similarity(p.flatten()[None], t.flatten()[None]).item() if p.numel() else 0.0
     denom = t.square().sum().clamp_min(1e-12)
-    energy = float(p.square().sum() / denom)
-    explained = 1.0 - float(diff.square().sum() / denom)
+    cosine = torch.nn.functional.cosine_similarity(p.flatten()[None], t.flatten()[None]).item()
     norms_p, norms_t = p.norm(dim=-1), t.norm(dim=-1)
+    centered = (t - t.mean(0)).square().sum().clamp_min(1e-12)
     return {
-        "global_cosine": float(cosine),
-        "active_cosine": float(cosine),
-        "energy_ratio": energy,
-        "explained_variance": explained,
+        "count": int(mask.sum()),
+        "cosine": float(cosine),
+        "energy_ratio": float(p.square().sum() / denom),
+        "explained_variance": float(1.0 - diff.square().sum() / centered),
         "magnitude_pearson": _safe_corr(norms_p, norms_t),
         "magnitude_spearman": _safe_corr(torch.argsort(torch.argsort(norms_p)), torch.argsort(torch.argsort(norms_t))),
-        "active_count": int(mask.sum()),
-        "pred_norm_mean": float(norms_p.mean()) if norms_p.numel() else 0.0,
-        "target_norm_mean": float(norms_t.mean()) if norms_t.numel() else 0.0,
-        "foreground_energy_percent": float(pred[mask].square().sum() / pred.square().sum().clamp_min(1e-12) * 100),
+        "pred_norm_mean": float(norms_p.mean()),
+        "target_norm_mean": float(norms_t.mean()),
     }
+
+
+def delta_metrics(pred, target, active_mask=None, source_xyz=None,
+                  foreground_mask=None, style_region_mask=None):
+    """Return distinct full-bank, foreground, and active-region metrics."""
+    pred = torch.as_tensor(pred).float()
+    target = torch.as_tensor(target).float()
+    n = pred.shape[0]
+    full = torch.ones(n, dtype=torch.bool)
+    fg = full if foreground_mask is None else torch.as_tensor(foreground_mask).bool()
+    active = fg if active_mask is None else torch.as_tensor(active_mask).bool()
+    result = {
+        "global": _region_metrics(pred, target, full),
+        "foreground": _region_metrics(pred, target, fg),
+        "active": _region_metrics(pred, target, active),
+        "background_energy": float(pred[~fg].square().sum()),
+        "active_energy_percent_of_foreground": float(pred[active].square().sum() / pred[fg].square().sum().clamp_min(1e-12) * 100),
+        "style_region_leakage": float(pred[fg & ~active].square().sum() / pred[fg].square().sum().clamp_min(1e-12)),
+    }
+    # Backward-compatible aliases point to active values but are explicitly
+    # labelled as legacy; callers should use result[region][metric].
+    result["global_cosine"] = result["global"]["cosine"]
+    result["active_cosine"] = result["active"]["cosine"]
+    result["energy_ratio"] = result["active"]["energy_ratio"]
+    result["explained_variance"] = result["active"]["explained_variance"]
+    result["active_count"] = result["active"]["count"]
+    return result
 
 
 def factorize_candidates(deltas, confidence=None, nuisance_features=None, trim_fraction=0.2):
