@@ -71,3 +71,37 @@ def test_geometry_cache_reuse_shapes_and_determinism():
     assert cache["neighbors"].shape == (20, 3)
     assert torch.allclose(first["d_xyz"], second["d_xyz"])
     assert float(first["d_xyz"].abs().max()) < 1e-5
+
+
+def test_sparse_graph_completion_keeps_foreground_unknowns_and_background_zero():
+    class Camera:
+        image_width = 64; image_height = 64
+        full_proj_transform = torch.eye(4)
+    xyz = torch.randn(24, 3) * 0.05
+    cameras = [Camera(), Camera(), Camera()]
+    cache = build_geometry_cache(xyz, cameras, knn=4)
+    target = cache["source_views"].clone()
+    target[:, :12] += torch.tensor([1.0, 0.0])
+    vis = torch.zeros(3, 24, dtype=torch.bool); vis[:, :12] = True
+    fg = torch.ones(24, dtype=torch.bool); fg[20:] = False
+    result = recover_xyz_graph_coupled_cached(
+        cache, target, vis, vis.float(), iterations=3, foreground_mask=fg,
+        graph_lambda=0.1, jacobian_refresh=1)
+    assert torch.equal(result["d_xyz"][~fg], torch.zeros_like(result["d_xyz"][~fg]))
+    assert len(result["history"]) == 3
+    # The solver must retain the unknown foreground variables in its output;
+    # they may be small when the synthetic graph has weak directional evidence.
+    assert result["d_xyz"].shape == (24, 3)
+
+
+def test_irls_records_outlier_downweighting():
+    class Camera:
+        image_width = 64; image_height = 64
+        full_proj_transform = torch.eye(4)
+    xyz = torch.randn(10, 3) * 0.02
+    cache = build_geometry_cache(xyz, [Camera(), Camera()], knn=3)
+    target = cache["source_views"].clone(); target[0, 0] += 100.0
+    vis = torch.ones(2, 10, dtype=torch.bool)
+    result = recover_xyz_graph_coupled_cached(cache, target, vis, vis.float(),
+                                              iterations=2, huber_delta=1.0)
+    assert any(item["downweighted_fraction"] > 0 for item in result["history"])

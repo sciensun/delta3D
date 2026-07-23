@@ -2,10 +2,10 @@
 
 ## Active Decision
 
-Select **R=5 standardized target samples** for the first real pilot. The v3
-controlled exact results improve from R=3 to R=5, and the full-bank recovered
-oracle-2D R=5 gate passes with structured no-label factorization. Do not
-generate them in this iteration; Stage 2 remains paused.
+Validate sparse observation recovery before any real target generation. The
+first implementation of IRLS was corrected to accumulate Newton increments;
+the rerun reaches the oracle result at 100% observations, but 10--40% coverage
+is still below the acceptance gate. Stage 2 and real generation remain paused.
 
 The five samples must use the same standardized prompt and condition. They are
 independent conditional generations, not deliberately heavy/slim/large-ear
@@ -19,6 +19,19 @@ variants. Record observed nuisance only after generation and quality control.
 - background energy: `0`;
 - `d_scaling`: exactly zero;
 - cache recovery: about `0.05 s` per candidate, peak RSS `424 MB`.
+
+Sparse benchmark artifact:
+`output/elephant_source_graphdeco/sparse_observation_benchmark/sparse_benchmark_summary.json`.
+The corrected graph/IRLS solver has active cosine means at 20% coverage of
+approximately `0.006` body, `0.048` ear, and `0.015` trunk; at 40% they are
+approximately `0.077`, `0.228`, and `0.014`; at 100% they are `1.000` for
+all three teachers. These low-coverage values fail the dense recovery gate.
+The old low-support-clearing baseline cannot recover unobserved regions by
+definition. A separate direct full-observation sanity check gives body active
+cosine `1.0`, energy ratio `1.0`, and near-zero reprojection residual.
+
+The next technical decision is whether to add silhouette/boundary observations
+and stronger multiscale graph priors, or to require higher point coverage.
 
 ## Real Pilot Layout
 

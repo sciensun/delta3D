@@ -157,7 +157,7 @@ def factorize_candidates(deltas, confidence=None, nuisance_features=None, trim_f
 def structured_no_label_factorization(deltas, confidence=None, rank=2,
                                       iterations=20, lambda_sparse=0.0,
                                       neighbors=None, graph_blend=0.05,
-                                      foreground_mask=None):
+                                      foreground_mask=None, huber_delta=0.01):
     """Alternating low-rank shared/nuisance factorization without labels.
 
     The intercept is S, mode fields are U, coefficients A are centered over
@@ -180,19 +180,38 @@ def structured_no_label_factorization(deltas, confidence=None, rank=2,
     a = a - a.mean(0, keepdim=True)
     u = torch.zeros((rank, n, c))
     eye = 1e-5 * torch.eye(rank)
+    history = []
     for _ in range(iterations):
-        aa = a.T @ a + eye
-        u = torch.einsum("kr,rnc->knc", torch.linalg.solve(aa, a.T), d - s[None])
+        residual0 = d - s[None] - torch.einsum("rk,knc->rnc", a, u)
+        residual_norm = residual0.norm(dim=-1).clamp_min(1e-8)
+        robust = torch.where(residual_norm <= huber_delta,
+                             torch.ones_like(residual_norm),
+                             huber_delta / residual_norm)
+        q = w * robust
+        # Per-Gaussian weighted normal equations make zero-confidence and
+        # missing regions contribute exactly zero to the nuisance modes.
+        normal_u = torch.einsum("rn,rk,rl->nkl", q, a, a) + eye[None]
+        rhs_u = torch.einsum("rn,rk,rnc->nkc", q, a, d - s[None])
+        u = torch.bmm(torch.linalg.pinv(normal_u), rhs_u).permute(1, 0, 2)
         if neighbors is not None and graph_blend > 0:
             u = (1 - graph_blend) * u + graph_blend * u[:, neighbors].mean(2)
-        uu = torch.einsum("knc,lnc->kl", u, u) + eye
-        a = torch.einsum("rnc,knc,kl->rl", d - s[None], u, torch.linalg.inv(uu))
+        # Template coefficients are also confidence-weighted.  The small
+        # template loop is intentional: R is typically 3-8, while N is large.
+        coeffs = []
+        for ri in range(r):
+            qri = q[ri]
+            normal_a = torch.einsum("n,knc,lnc->kl", qri, u, u) + eye
+            rhs_a = torch.einsum("n,nc,knc->k", qri, d[ri] - s, u)
+            coeffs.append(torch.linalg.solve(normal_a, rhs_a))
+        a = torch.stack(coeffs)
         a = a - a.mean(0, keepdim=True)
-        s = weighted_mean(d - torch.einsum("rk,knc->rnc", a, u), w)
+        s = weighted_mean(d - torch.einsum("rk,knc->rnc", a, u), q)
         if neighbors is not None and graph_blend > 0:
             s = (1 - graph_blend) * s + graph_blend * s[neighbors].mean(1)
         s[~foreground_mask] = 0
         u[:, ~foreground_mask] = 0
+        history.append({"objective_residual": float((q * residual0.square().sum(-1)).sum()),
+                        "robust_downweighted_fraction": float((robust < 1).float().mean())})
     reconstructed = s[None] + torch.einsum("rk,knc->rnc", a, u)
     residual = d - reconstructed
     reconstructed[:, ~foreground_mask] = 0
@@ -201,4 +220,5 @@ def structured_no_label_factorization(deltas, confidence=None, rank=2,
         residual = torch.sign(residual) * torch.relu(residual.abs() - lambda_sparse)
     return {"shared": s, "nuisance_modes": u, "coefficients": a,
             "residual": residual, "reconstructed": reconstructed,
-            "rank": int(rank), "convergence_residual_norm": float(residual.norm())}
+            "rank": int(rank), "convergence_residual_norm": float(residual.norm()),
+            "history": history}

@@ -6,10 +6,7 @@ import time
 from .gaussian_visibility import project_points
 
 
-def build_geometry_cache(source_xyz, cameras, knn=8, jacobian_eps=1e-3):
-    """Build reusable source geometry for multiple observed-2d candidates."""
-    started = time.perf_counter()
-    xyz = torch.as_tensor(source_xyz).float().cpu()
+def _project_with_jacobian(xyz, cameras, jacobian_eps=1e-3):
     source_views, jacobians = [], []
     for camera in cameras:
         base, _, _ = project_points(xyz, camera.full_proj_transform,
@@ -20,8 +17,15 @@ def build_geometry_cache(source_xyz, cameras, knn=8, jacobian_eps=1e-3):
             plus, _, _ = project_points(shifted, camera.full_proj_transform,
                                         camera.image_width, camera.image_height)
             columns.append((plus - base) / jacobian_eps)
-        source_views.append(base)
-        jacobians.append(torch.stack(columns, dim=-1))
+        source_views.append(base); jacobians.append(torch.stack(columns, dim=-1))
+    return torch.stack(source_views), torch.stack(jacobians)
+
+
+def build_geometry_cache(source_xyz, cameras, knn=8, jacobian_eps=1e-3):
+    """Build reusable source geometry for multiple observed-2d candidates."""
+    started = time.perf_counter()
+    xyz = torch.as_tensor(source_xyz).float().cpu()
+    source_views, jacobians = _project_with_jacobian(xyz, cameras, jacobian_eps)
     try:
         from scipy.spatial import cKDTree
         _, neighbors = cKDTree(xyz.numpy()).query(xyz.numpy(), k=min(knn + 1, len(xyz)))
@@ -29,9 +33,13 @@ def build_geometry_cache(source_xyz, cameras, knn=8, jacobian_eps=1e-3):
     except Exception:
         neighbors = np.tile(np.arange(len(xyz))[:, None], (1, min(knn, len(xyz))))
     neighbors = torch.from_numpy(neighbors).long()
-    return {"source_xyz": xyz, "source_views": torch.stack(source_views),
-            "jacobians": torch.stack(jacobians), "neighbors": neighbors,
-            "degree": torch.full((len(xyz),), neighbors.shape[1], dtype=torch.float32),
+    distance = (xyz[neighbors] - xyz[:, None]).norm(dim=-1).clamp_min(1e-6)
+    graph_weights = (1.0 / distance)
+    graph_weights = graph_weights / graph_weights.sum(1, keepdim=True).clamp_min(1e-8)
+    return {"source_xyz": xyz, "source_views": source_views,
+            "jacobians": jacobians, "neighbors": neighbors, "graph_weights": graph_weights,
+            "degree": torch.ones((len(xyz),), dtype=torch.float32),
+            "cameras": cameras, "jacobian_eps": jacobian_eps,
             "knn": int(neighbors.shape[1]),
             "cache_build_seconds": time.perf_counter() - started}
 
@@ -39,32 +47,68 @@ def build_geometry_cache(source_xyz, cameras, knn=8, jacobian_eps=1e-3):
 def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=None,
                                     iterations=40, graph_lambda=0.01,
                                     magnitude_lambda=1e-4, min_support=2,
-                                    huber_delta=3.0):
+                                    huber_delta=3.0, foreground_mask=None,
+                                    frozen_mask=None, clear_unobserved=False,
+                                    jacobian_refresh=2):
     """Vectorized graph-coupled recovery using a reusable geometry cache."""
     started = time.perf_counter()
     target_xy = torch.as_tensor(target_xy).float().cpu()
     visibility = torch.as_tensor(visibility).bool().cpu()
     confidence = torch.ones_like(visibility, dtype=torch.float32) if confidence is None else torch.as_tensor(confidence).float().cpu()
     views, jac, neighbors = cache["source_views"], cache["jacobians"], cache["neighbors"]
-    residual = target_xy - views
-    weights = visibility.float() * confidence.clamp_min(0)
-    normal = torch.einsum("vn,vnij,vnik->njk", weights, jac, jac)
-    rhs = torch.einsum("vn,vnij,vni->nj", weights, jac, residual)
-    eye = torch.eye(3).expand(normal.shape[0], 3, 3)
-    normal = torch.nan_to_num(normal) + magnitude_lambda * eye
-    rhs = torch.nan_to_num(rhs)
+    n = views.shape[1]
+    foreground_mask = torch.ones(n, dtype=torch.bool) if foreground_mask is None else torch.as_tensor(foreground_mask).bool()
+    frozen_mask = torch.zeros(n, dtype=torch.bool) if frozen_mask is None else torch.as_tensor(frozen_mask).bool()
+    eye = torch.eye(3).expand(n, 3, 3)
     support = visibility.sum(0)
-    delta = torch.zeros((normal.shape[0], 3))
-    degree = cache["degree"]
-    graph_eye = graph_lambda * degree[:, None, None] * eye
-    for _ in range(iterations):
-        neighbor_sum = delta[neighbors].sum(1)
-        lhs = normal + graph_eye + 1e-6 * eye
-        delta = torch.linalg.solve(lhs, rhs + graph_lambda * neighbor_sum)
-    delta[support < min_support] = 0
+    delta = torch.zeros((n, 3))
+    graph_weights = cache.get("graph_weights", torch.ones(neighbors.shape) / neighbors.shape[1])
+    history = []
+    downweighted = torch.zeros_like(visibility, dtype=torch.bool)
+    for step in range(iterations):
+        if step == 0 or (jacobian_refresh and step % jacobian_refresh == 0):
+            current_views, current_jac = _project_with_jacobian(cache["source_xyz"] + delta, cache["cameras"], cache["jacobian_eps"])
+        else:
+            current_views, current_jac = current_views, current_jac
+        residual = target_xy - current_views
+        pred_error = residual.norm(dim=-1)
+        robust = torch.where(pred_error <= huber_delta, torch.ones_like(pred_error), huber_delta / pred_error.clamp_min(1e-6))
+        downweighted = robust < 1
+        weights = visibility.float() * confidence.clamp_min(0) * robust
+        normal = torch.einsum("vn,vnij,vnik->njk", weights, current_jac, current_jac)
+        rhs = torch.einsum("vn,vnij,vni->nj", weights, current_jac, residual)
+        normal = torch.nan_to_num(normal) + magnitude_lambda * eye
+        rhs = torch.nan_to_num(rhs)
+        neighbor_mean = (delta[neighbors] * graph_weights[..., None]).sum(1)
+        lhs = normal + graph_lambda * eye + 1e-4 * eye
+        # The reprojection residual is linearized around the current delta, so
+        # the solve returns an increment.  Treating it as an absolute delta
+        # makes IRLS diverge even with complete, noiseless observations.
+        rhs_step = rhs + graph_lambda * (neighbor_mean - delta) - magnitude_lambda * delta
+        try:
+            step_update = torch.linalg.solve(lhs, rhs_step)
+        except RuntimeError:
+            # Sparse visibility can leave a few local normal matrices nearly
+            # singular.  Pinv is a deterministic CPU fallback for those
+            # batches and keeps the diagnostic from dropping valid points.
+            step_update = torch.bmm(torch.linalg.pinv(lhs), rhs_step.unsqueeze(-1)).squeeze(-1)
+        step_update[frozen_mask | ~foreground_mask] = 0
+        delta = delta + step_update
+        active = foreground_mask & ~frozen_mask
+        history.append({"iteration": step, "reprojection_loss": float((residual[visibility].square()).mean()) if visibility.any() else 0.0,
+                        "update_norm": float(step_update[active].norm()) if active.any() else 0.0,
+                        "downweighted_fraction": float(downweighted[visibility].float().mean()) if visibility.any() else 0.0})
+    if clear_unobserved:
+        delta[(support < min_support) & foreground_mask & ~frozen_mask] = 0
+    delta[~foreground_mask | frozen_mask] = 0
+    final_views, final_jac = _project_with_jacobian(cache["source_xyz"] + delta,
+                                                    cache["cameras"],
+                                                    cache["jacobian_eps"])
+    residual = target_xy - final_views
     return {"d_xyz": delta, "support_count": support,
-            "reprojection_residual": residual, "source_views": views,
-            "jacobians": jac, "neighbors": neighbors,
+            "reprojection_residual": residual, "source_views": current_views,
+            "jacobians": current_jac, "neighbors": neighbors, "history": history,
+            "downweighted": downweighted,
             "cache_build_seconds": cache.get("cache_build_seconds", 0.0),
             "recovery_seconds": time.perf_counter() - started}
 

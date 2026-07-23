@@ -291,3 +291,11 @@ The original renderer and source dynamic reconstruction code are from [Deformabl
   year={2023}
 }
 ```
+# Current sparse-observation status
+
+The CPU fixed-bank diagnostic now supports cached graph completion with
+foreground masks and nonlinear IRLS. Complete oracle observed-2D recovery is
+validated, but the current 10--40% sparse benchmark does not meet the dense
+recovery gate. The next active work is silhouette/boundary observations and
+multiscale structural priors; real target generation and Stage 2 remain
+paused. See `NEXT_STEPS.md` and `EXPERIMENT_LOG.md`.

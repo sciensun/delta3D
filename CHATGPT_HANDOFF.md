@@ -1,41 +1,40 @@
-# ChatGPT Handoff: Calibrated Full-Bank Target-Template Factorization
+# ChatGPT Handoff: Sparse Observation Recovery
 
 ## Status
 
-**PARTIAL / controlled full-bank gate PASS.** No real target images or Stage 2
-training were run.
+**FAIL / PARTIAL.** The complete-observation sanity check passes, but the
+20--40% sparse fixed-bank recovery gate fails. Stage 2 remains paused.
+
+## Objective
+
+Test whether sparse observed-2D target observations can recover dense xyz-only
+deformation while keeping background and d_scaling exactly zero.
 
 ## Changes
 
-- calibrated total realized nuisance norm rather than per-basis ratio;
-- added graph-smoothed/decorrelated nuisance modes and support conditions;
-- added actual outlier, confidence, missing-region, invalid, poor-candidate,
-  label, and bias branches;
-- added structured no-label factorization;
-- added reusable/vectorized full-bank CPU geometry cache;
-- corrected docs and selected five standardized pilot samples.
+- corrected the cached IRLS solver to accumulate nonlinear Newton increments;
+- retained unobserved foreground as graph-constrained variables;
+- added robust singular-normal fallback and convergence history;
+- added confidence-aware structured factorization updates;
+- added five-sample real-pilot QC preflight;
+- updated sparse benchmark and research documentation.
 
-## Results
+## Validation
 
-Full bank: 44,764 Gaussians, 8 views, R=5, total nuisance norm/style norm
-`0.5` (energy ratio `0.25`). Structured no-label recovery: active cosine
-`0.994`, centered explained variance `0.987`, style leakage `0.017`, background
-energy `0`, and exact-zero `d_scaling`. Single candidate: cosine `0.943`,
-explained variance `0.887`. Cache `0.14 s`, recovery about `0.05 s/candidate`,
-peak RSS about `424 MB`.
+`python scripts/run_sparse_observation_benchmark.py` ran on body roundness, ear
+expansion, and trunk bending at 10/20/40/60/100 percent with five deterministic
+seeds. At 20 percent active-cosine means were body `0.006`, ear `0.048`, trunk
+`0.015`; at 40 percent `0.077`, `0.228`, `0.014`; at 100 percent all were
+`1.000`. Direct full-observation body sanity: cosine `1.0`, energy ratio `1.0`,
+near-zero reprojection residual. CPU syntax and 16 fixture-free tests passed;
+three fixture-based tests were skipped because pytest is unavailable.
 
-## Limitation
+## Limitation and decision
 
-This remains a one-object controlled oracle-observation result. Systematic
-target-template bias is not identifiable from one source. Real standardized
-targets, CUDA validation, cross-object representation, and Stage 2 remain
-unimplemented.
+Sparse points alone do not presently provide sufficient dense recovery. The
+next experiment should add silhouette/boundary observations and stronger
+multiscale graph priors, then rerun the sparse gate. No real target images were
+generated and no style-transfer claim is made.
 
-## Decision
-
-Use five identical-condition standardized target samples for the first real
-pilot. Generate and evaluate them in the next iteration, not this one.
-
-Implementation commit SHA: `d27b8cae395cb890c5369638b49d80e7415ca535`.
-This handoff belongs to the final commit reported by cdx; the final HEAD is
-reported separately to avoid recursive SHA metadata commits.
+Implementation commit SHA: `pending until commit`.
+Final HEAD is reported separately to avoid recursive metadata commits.

@@ -550,3 +550,34 @@ The full-bank recovered gate passes for this controlled R=5 case. No real
 target images or Stage 2 training were run. The deliberate systematic-bias
 case remains non-identifiable from one source: a shared target bias cannot be
 separated from style without a prior, labels, or multiple source objects.
+## Sparse observation recovery and IRLS correction (2026-07-23)
+
+Implemented `recover_xyz_graph_coupled_cached` with cached source geometry,
+foreground/frozen masks, graph completion for unobserved foreground, and
+robust nonlinear IRLS. An initial run failed even at full coverage because the
+Newton step was assigned as an absolute delta. The implementation was fixed to
+accumulate `delta += step`, refresh the projection/Jacobian every iteration in
+the benchmark, and use a pseudoinverse fallback for singular sparse normals.
+
+Command:
+
+```bash
+python scripts/run_sparse_observation_benchmark.py
+```
+
+Artifact:
+`output/elephant_source_graphdeco/sparse_observation_benchmark/sparse_benchmark_summary.json`.
+
+The benchmark uses body roundness, ear expansion, and trunk bending; coverage
+10/20/40/60/100 percent; five deterministic seeds; exact zero background and
+zero `d_scaling`. Corrected active-cosine means at 20 percent are body `0.006`,
+ear `0.048`, trunk `0.015`; at 40 percent body `0.077`, ear `0.228`, trunk
+`0.014`; at 100 percent all three are `1.000`. The result is a clear failure
+of the sparse acceptance gate, while a direct complete-observation sanity
+check gives body cosine `1.0`, energy ratio `1.0`, and near-zero reprojection
+residual. The low-support-clearing baseline is not a valid dense-completion
+method because it intentionally zeros unobserved foreground.
+
+Added `scripts/qc_real_pilot.py`; with no real images it correctly reports the
+five-sample pilot as `PENDING`. No Stage 2, real image generation, d_scaling,
+or background motion was run.

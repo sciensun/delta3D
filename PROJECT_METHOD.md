@@ -236,3 +236,19 @@ displacement strata. Global PCK is not a valid local-teacher criterion because
 inactive points can dominate it. A CPU IRLS reprojection diagnostic and a
 distinct signed-distance silhouette observation are implemented for downstream
 diagnosis; neither currently recovers the synthetic body delta reliably.
+## Sparse observation recovery (validated CPU diagnostic)
+
+The fixed-bank Stage 1 diagnostic now distinguishes observed foreground,
+unobserved foreground, and background. Observed points receive reprojection
+constraints; unobserved foreground remains an unknown graph-constrained
+variable and is not zeroed after solving. Background and explicitly frozen
+regions are exactly zero. The solver uses cached projections/Jacobians, robust
+IRLS weights, periodic nonlinear Jacobian refresh, and distance-weighted source
+KNN edges. This is a CPU diagnostic, not a replacement for differentiable
+Stage 1.
+
+The current sparse benchmark passes the complete-observation sanity check but
+fails the 20--40% dense-recovery gate. Silhouette/boundary observations and
+stronger structural priors are therefore required before real target images.
+Structured factorization remains evaluated separately from mean plus graph
+smoothing; no Stage 2 training or part compression is permitted yet.
