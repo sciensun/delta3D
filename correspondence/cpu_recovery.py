@@ -34,6 +34,23 @@ def solve_symmetric_graph(rhs, diagonal, edge_index, edge_weights, graph_lambda=
     return torch.from_numpy(out), {"cg_info": info, "maxiter": maxiter, "tol": tol}
 
 
+def solve_symmetric_graph_block(normal, rhs, edge_index, edge_weights,
+                                graph_lambda=0.01, maxiter=100, tol=1e-5):
+    """PCG solve for per-Gaussian 3x3 normals plus an undirected graph prior."""
+    import numpy as np
+    from scipy.sparse.linalg import LinearOperator, cg
+    h = torch.as_tensor(normal).float().cpu().numpy(); b = torch.as_tensor(rhs).float().cpu().numpy()
+    e = torch.as_tensor(edge_index).long().cpu().numpy(); w = torch.as_tensor(edge_weights).float().cpu().numpy(); n = h.shape[0]
+    def matvec(flat):
+        x = flat.reshape(n, 3); y = np.einsum('nij,nj->ni', h, x)
+        diff = x[e[:, 0]] - x[e[:, 1]]
+        np.add.at(y, e[:, 0], graph_lambda * w[:, None] * diff)
+        np.add.at(y, e[:, 1], -graph_lambda * w[:, None] * diff)
+        return y.reshape(-1)
+    op=LinearOperator((3*n,3*n),matvec=matvec,dtype=np.float64); sol,code=cg(op,b.reshape(-1).astype(np.float64),maxiter=maxiter,tol=tol)
+    return torch.from_numpy(sol.reshape(n,3)).float(), {"cg_info":int(code),"maxiter":maxiter,"tol":tol}
+
+
 def _project_with_jacobian(xyz, cameras, jacobian_eps=1e-3):
     source_views, jacobians = [], []
     for camera in cameras:

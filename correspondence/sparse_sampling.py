@@ -17,6 +17,42 @@ def eligible_tracks(visibility, foreground_mask, min_views=2):
     return fg & (v.sum(0) >= int(min_views))
 
 
+def conditioning_metrics(source_xyz, cameras, visibility, jacobians=None):
+    """Per-track baseline, ray-angle, Jacobian condition and depth proxy."""
+    xyz = torch.as_tensor(source_xyz).float(); v = torch.as_tensor(visibility).bool()
+    centers = camera_centers(cameras)
+    rays = centers[:, None, :] - xyz[None, :, :]
+    rays = rays / rays.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+    n = xyz.shape[0]; baseline = torch.zeros(n); angle = torch.zeros(n); cond = torch.full((n,), float('inf'))
+    depth_uncertainty = torch.full((n,), float('inf'))
+    if jacobians is not None:
+        j = torch.as_tensor(jacobians).float()
+    for i in range(n):
+        valid = torch.nonzero(v[:, i]).flatten()
+        if len(valid) >= 2:
+            pairs = torch.combinations(valid, 2)
+            baseline[i] = torch.cdist(centers[valid], centers[valid]).max()
+            dots = (rays[pairs[:, 0], i] * rays[pairs[:, 1], i]).sum(-1).clamp(-1, 1)
+            angle[i] = torch.acos(dots).max()
+        if jacobians is not None and len(valid) >= 2:
+            stacked = j[valid, i].reshape(-1, 3)
+            sv = torch.linalg.svdvals(stacked)
+            cond[i] = sv[0] / sv[-1].clamp_min(1e-8)
+            depth_uncertainty[i] = 1.0 / sv[-1].clamp_min(1e-8)
+    return {"baseline": baseline, "ray_angle": angle, "condition_number": cond,
+            "depth_uncertainty": depth_uncertainty}
+
+
+def strict_eligible_tracks(source_xyz, cameras, visibility, foreground_mask,
+                           jacobians=None, min_views=2, min_baseline=0.0,
+                           min_ray_angle=0.0, max_condition=float('inf')):
+    base = eligible_tracks(visibility, foreground_mask, min_views)
+    metrics = conditioning_metrics(source_xyz, cameras, visibility, jacobians)
+    eligible = base & (metrics['baseline'] >= min_baseline) & (metrics['ray_angle'] >= min_ray_angle)
+    eligible &= metrics['condition_number'] <= max_condition
+    return eligible, metrics
+
+
 def _choose_views(valid, k, pair_scores=None, generator=None):
     if len(valid) <= k:
         return valid
@@ -48,12 +84,13 @@ def track_dropout(visibility, fraction, foreground_mask, seed):
 
 
 def fixed_views_per_track(visibility, fraction, views_per_track, foreground_mask, seed,
-                          baseline_scores=None, min_original_views=None):
+                          baseline_scores=None, min_original_views=None, eligible_mask=None):
     v = torch.as_tensor(visibility).bool().clone()
     fg = torch.as_tensor(foreground_mask).bool()
     g = torch.Generator().manual_seed(int(seed))
     min_original_views = views_per_track if min_original_views is None else min_original_views
-    selected = (torch.rand(v.shape[1], generator=g) < float(fraction)) & eligible_tracks(v, fg, min_original_views)
+    population = eligible_tracks(v, fg, min_original_views) if eligible_mask is None else torch.as_tensor(eligible_mask).bool()
+    selected = (torch.rand(v.shape[1], generator=g) < float(fraction)) & population
     out = torch.zeros_like(v)
     for i in torch.nonzero(selected).flatten().tolist():
         valid = torch.nonzero(v[:, i]).flatten()

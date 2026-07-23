@@ -621,3 +621,18 @@ claimed. Hidden-GT control ceilings are body
 `0.925/0.939/0.949/0.962`, ear `0.918/0.947/0.951/0.969`, and trunk
 `0.818/0.913/0.933/0.939` for M=`32/64/128/256`. Noise/outlier, silhouette,
 and full robust-gate branches remain incomplete.
+
+Exact-K two-view recovery at track fraction `0.20`, five seeds, gives active
+cosine means body/ear/trunk `0.899/0.889/0.871` for both random and
+maximum-center-baseline selection. Robust observations at 1 px noise retained
+body/ear active cosine `0.898/0.888`; 5% overconfident outliers reduced them to
+`-0.081/-0.011`, failing the robust gate. Silhouette-only and hybrid branches
+were not run because the clean synthetic observed-2D bundle has no silhouette
+payload.
+
+Full-bank linearized PCG versus local IRLS on body track fraction `0.20`:
+local IRLS-100 active cosine `0.971`, runtime `11.97 s`; PCG active cosine
+`0.443`, runtime `0.52 s`, CG info `0`. PCG solves the explicit undirected
+quadratic but its linearized/no-robust observation model is not yet equivalent
+to nonlinear IRLS. The graph has 137,393 undirected edges, 157 components, and
+largest component 42,164 vertices.

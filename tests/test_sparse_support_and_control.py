@@ -1,6 +1,7 @@
 import torch
 
-from correspondence.sparse_sampling import fixed_views_per_track, observability_report, track_dropout
+from correspondence.sparse_sampling import (fixed_views_per_track, observability_report,
+                                             track_dropout, conditioning_metrics)
 from correspondence.control_graph import interpolation_weights
 from correspondence.cpu_recovery import solve_symmetric_graph
 from correspondence.benchmark_artifacts import upsert_records, validate_records
@@ -47,3 +48,16 @@ def test_benchmark_records_replace_duplicate_keys():
     merged = upsert_records([dict(a, value=1)], [dict(a, value=2)])
     assert len(merged) == 1 and merged[0]["value"] == 2
     assert validate_records(merged)["unique"] == 1
+
+
+def test_conditioning_metrics_and_eligible_k_views():
+    class Camera:
+        def __init__(self, x):
+            self.world_view_transform = torch.eye(4); self.world_view_transform[3, 0] = -x
+    cameras = [Camera(0.), Camera(1.), Camera(2.)]
+    xyz = torch.zeros(4, 3); visibility = torch.ones(3, 4, dtype=torch.bool)
+    metrics = conditioning_metrics(xyz, cameras, visibility)
+    assert float(metrics["baseline"].min()) > 0
+    assert float(metrics["ray_angle"].max()) >= 0
+    sampled, selected = fixed_views_per_track(visibility, 1.0, 2, torch.ones(4, dtype=torch.bool), 1)
+    assert torch.equal(sampled.sum(0), torch.full((4,), 2))

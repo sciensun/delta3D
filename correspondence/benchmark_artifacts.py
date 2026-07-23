@@ -2,7 +2,7 @@
 
 DEFAULT_KEY_FIELDS = ("teacher", "mode", "fraction", "views_per_track",
                       "baseline_policy", "seed", "noise", "outlier_rate",
-                      "solver", "control_count")
+                      "confidence_mode", "solver", "control_count")
 
 
 def record_key(record, fields=DEFAULT_KEY_FIELDS):

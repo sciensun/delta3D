@@ -263,3 +263,9 @@ The explicit graph edge list stores each undirected edge once and exposes a
 matrix-free symmetric Laplacian energy plus a CPU PCG solve. The current full
 research gate still uses the IRLS recovery path; PCG has only passed the small
 quadratic equivalence test in this iteration.
+
+Primary eligible tracks are defined by foreground membership, original view
+support, baseline, ray angle, and Jacobian condition thresholds. Camera-center
+distance is reported together with ray-angle and condition diagnostics; it is
+not treated as a complete triangulability criterion. Exact-K sampling rejects
+tracks below K original valid views.

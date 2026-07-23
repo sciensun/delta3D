@@ -20,6 +20,8 @@ deformation while keeping background and d_scaling exactly zero.
 - added post-recovery five-candidate sparse factorization comparison;
 - added track-aware support diagnostics, symmetric mutual-KNN graph, and
   control-node translation prior;
+- added strict K-view support and camera conditioning diagnostics;
+- added full-bank linearized PCG comparison and control representation ceilings.
 - updated sparse benchmark and research documentation.
 
 ## Validation
@@ -41,12 +43,19 @@ completion active cosine body/ear/trunk is `0.898/0.880/0.881` at `0.2` and
 `0.972/0.963/0.959` at `0.4`. A 64-control graph reaches
 `0.938/0.942/0.908` on the same teachers at `0.2`.
 
+The current five-seed exact-K two-view fraction `0.20` means are body/ear/trunk
+`0.899/0.889/0.871` for both random and maximum-center-baseline selection.
+At 1 px noise body/ear are `0.898/0.888`; at 5% overconfident outliers they
+fall to `-0.081/-0.011`. Full-bank IRLS-100 active cosine is `0.971` versus
+linearized PCG `0.443`; PCG is faster but not yet an equivalent nonlinear
+solver. The graph has 137,393 edges and 157 components.
+
 ## Limitation and decision
 
-Sparse points alone do not presently provide sufficient dense recovery. The
-next experiment should complete five-seed track-aware validation and add
-silhouette/boundary observations. No real target images were
-generated and no style-transfer claim is made.
+Status remains **PARTIAL**: independent per-view dropout is a FAIL stress test;
+clean all-valid and exact-K track-aware recovery is promising; robust
+noise/outlier and silhouette/hybrid gates are incomplete. No real target images
+were generated and no style-transfer claim is made.
 
 Track-aware implementation baseline: `a192585`.
 Final HEAD is reported separately to avoid recursive metadata commits.

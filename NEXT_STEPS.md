@@ -54,6 +54,11 @@ records at fraction `0.20`. Active cosine mean/std/min/max are body
 runs. This is promising but not the robust gate: baseline-conditioned K-view,
 noise, outlier, and silhouette branches are still pending.
 
+Exact-K two-view five-seed fraction `0.20` is also stable: body/ear/trunk
+active cosine means are `0.899/0.889/0.871` for both random and
+maximum-center-baseline selection. This synthetic equality does not replace
+ray-angle and condition-number diagnostics.
+
 ## Real Pilot Layout
 
 Expand the empty layout to `sample_A` through `sample_E`, each with the same
