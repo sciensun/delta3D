@@ -59,6 +59,15 @@ active cosine means are `0.899/0.889/0.871` for both random and
 maximum-center-baseline selection. This synthetic equality does not replace
 ray-angle and condition-number diagnostics.
 
+This iteration completed the first robust correspondence comparison. At 1 px
+noise, body/ear active cosine remains `0.898/0.888`. At 5% overconfident
+outliers, Huber collapses to `-0.081/-0.011`; iterative rejection improves
+body/ear/trunk to approximately `0.769/0.772/0.803` but does not satisfy the
+0.85 robust gate. Correct target silhouette observations currently produce
+body/ear/trunk cosine `0.000/-0.019/0.004`, versus source-silhouette null
+controls `-0.004/0.008/-0.013`; silhouette implementation is therefore not
+yet useful and needs better synthetic mask/gradient calibration.
+
 ## Real Pilot Layout
 
 Expand the empty layout to `sample_A` through `sample_E`, each with the same

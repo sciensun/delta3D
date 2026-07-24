@@ -22,6 +22,8 @@ deformation while keeping background and d_scaling exactly zero.
   control-node translation prior;
 - added strict K-view support and camera conditioning diagnostics;
 - added full-bank linearized PCG comparison and control representation ceilings.
+- added robust kernels and delayed cross-view track rejection;
+- added synthetic silhouette generation and null/shuffled-control diagnostics.
 - updated sparse benchmark and research documentation.
 
 ## Validation
@@ -49,6 +51,12 @@ At 1 px noise body/ear are `0.898/0.888`; at 5% overconfident outliers they
 fall to `-0.081/-0.011`. Full-bank IRLS-100 active cosine is `0.971` versus
 linearized PCG `0.443`; PCG is faster but not yet an equivalent nonlinear
 solver. The graph has 137,393 edges and 157 components.
+
+At 1 px noise body/ear remain `0.898/0.888`. At 5% overconfident outliers,
+Huber is `-0.081/-0.011`; delayed rejection improves body/ear/trunk to
+`0.769/0.772/0.803`, still below the robust gate. Correct silhouette versus
+source-silhouette null active cosine is body `0.000/-0.004`, ear
+`-0.019/0.008`, trunk `0.004/-0.013`; no genuine silhouette gain is shown.
 
 ## Limitation and decision
 

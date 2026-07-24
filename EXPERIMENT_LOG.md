@@ -636,3 +636,17 @@ local IRLS-100 active cosine `0.971`, runtime `11.97 s`; PCG active cosine
 quadratic but its linearized/no-robust observation model is not yet equivalent
 to nonlinear IRLS. The graph has 137,393 undirected edges, 157 components, and
 largest component 42,164 vertices.
+
+Conditioning diagnostics on the body source foreground give baseline p10/p50/p90
+`7.707/7.707/7.707`, ray-angle p10/p50/p90 `2.932/3.039/3.103` radians,
+Jacobian condition p10/p50/p90 `1.407/1.413/1.414`, and depth proxy
+`0.00116/0.00118/0.00118`. In one clean track-dropout recovery, error
+correlation with ray angle/condition/depth uncertainty was `0.087/0.086/0.028`;
+conditioning is nearly uniform in this synthetic camera set, so it does not
+explain much variance.
+
+`synthetic_silhouette_summary.json` contains correct-target, source-mask null,
+and no-point silhouette-only controls. Correct-target active cosine was
+body/ear/trunk `0.000/-0.019/0.004`; null was `-0.004/0.008/-0.013`.
+The control does not show a genuine gain. Tracks-only plus silhouette was not
+claimed because the current clean bundle has no silhouette observations.

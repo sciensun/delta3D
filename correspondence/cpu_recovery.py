@@ -130,7 +130,8 @@ def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=No
                                     magnitude_lambda=1e-4, min_support=2,
                                     huber_delta=3.0, foreground_mask=None,
                                     frozen_mask=None, clear_unobserved=False,
-                                    jacobian_refresh=2):
+                                    jacobian_refresh=2, robust_kernel="huber",
+                                    reject_after=2, reject_threshold=8.0):
     """Vectorized graph-coupled recovery using a reusable geometry cache."""
     started = time.perf_counter()
     target_xy = torch.as_tensor(target_xy).float().cpu()
@@ -146,6 +147,7 @@ def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=No
     graph_weights = cache.get("graph_weights", torch.ones(neighbors.shape) / neighbors.shape[1])
     history = []
     downweighted = torch.zeros_like(visibility, dtype=torch.bool)
+    accepted = visibility.clone()
     for step in range(iterations):
         if step == 0 or (jacobian_refresh and step % jacobian_refresh == 0):
             current_views, current_jac = _project_with_jacobian(cache["source_xyz"] + delta, cache["cameras"], cache["jacobian_eps"])
@@ -153,9 +155,20 @@ def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=No
             current_views, current_jac = current_views, current_jac
         residual = target_xy - current_views
         pred_error = residual.norm(dim=-1)
-        robust = torch.where(pred_error <= huber_delta, torch.ones_like(pred_error), huber_delta / pred_error.clamp_min(1e-6))
+        if robust_kernel == "tukey":
+            q = (pred_error / huber_delta).clamp_min(0)
+            robust = torch.where(q < 1, (1 - q.square()).square(), torch.zeros_like(q))
+        elif robust_kernel == "reject" and step < reject_after:
+            robust = torch.where(pred_error <= huber_delta, torch.ones_like(pred_error), huber_delta / pred_error.clamp_min(1e-6))
+        elif robust_kernel == "clip" or robust_kernel == "reject":
+            robust = (pred_error <= huber_delta).float()
+        else:
+            robust = torch.where(pred_error <= huber_delta, torch.ones_like(pred_error), huber_delta / pred_error.clamp_min(1e-6))
+        if robust_kernel == "reject" and step >= reject_after:
+            accepted = accepted & ~(pred_error > reject_threshold)
+        effective_visibility = accepted
         downweighted = robust < 1
-        weights = visibility.float() * confidence.clamp_min(0) * robust
+        weights = effective_visibility.float() * confidence.clamp_min(0) * robust
         normal = torch.einsum("vn,vnij,vnik->njk", weights, current_jac, current_jac)
         rhs = torch.einsum("vn,vnij,vni->nj", weights, current_jac, residual)
         normal = torch.nan_to_num(normal) + magnitude_lambda * eye
@@ -174,7 +187,8 @@ def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=No
         active = foreground_mask & ~frozen_mask
         history.append({"iteration": step, "reprojection_loss": float((residual[visibility].square()).mean()) if visibility.any() else 0.0,
                         "update_norm": float(step_update[active].norm()) if active.any() else 0.0,
-                        "downweighted_fraction": float(downweighted[visibility].float().mean()) if visibility.any() else 0.0})
+                        "downweighted_fraction": float(downweighted[visibility].float().mean()) if visibility.any() else 0.0,
+                        "rejected_fraction": float((visibility & ~accepted).float().sum() / visibility.float().sum().clamp_min(1))})
     if clear_unobserved:
         delta[(support < min_support) & foreground_mask & ~frozen_mask] = 0
     delta[~foreground_mask | frozen_mask] = 0
@@ -186,6 +200,7 @@ def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=No
             "reprojection_residual": residual, "source_views": current_views,
             "jacobians": current_jac, "neighbors": neighbors, "history": history,
             "downweighted": downweighted,
+            "accepted_visibility": accepted,
             "cache_build_seconds": cache.get("cache_build_seconds", 0.0),
             "recovery_seconds": time.perf_counter() - started}
 

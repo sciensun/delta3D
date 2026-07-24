@@ -14,7 +14,7 @@ from stage1.template_factorization import delta_metrics
 
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--teachers', nargs='+', default=['body_roundness','ear_expansion','trunk_bending']); ap.add_argument('--modes', nargs='+', default=['track_dropout','exact_k_views_per_track','baseline_maximized_k_views']); ap.add_argument('--fractions', nargs='+', type=float, default=[.1,.2,.4,.6]); ap.add_argument('--seeds', nargs='+', type=int, default=[11,29,47,71,97]); ap.add_argument('--views_per_track', type=int, default=2); ap.add_argument('--noise_px', type=float, default=0.0); ap.add_argument('--outlier_rate', type=float, default=0.0); ap.add_argument('--confidence_mode', choices=['calibrated','missing','overconfident_outliers'], default='calibrated'); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('--teachers', nargs='+', default=['body_roundness','ear_expansion','trunk_bending']); ap.add_argument('--modes', nargs='+', default=['track_dropout','exact_k_views_per_track','baseline_maximized_k_views']); ap.add_argument('--fractions', nargs='+', type=float, default=[.1,.2,.4,.6]); ap.add_argument('--seeds', nargs='+', type=int, default=[11,29,47,71,97]); ap.add_argument('--views_per_track', type=int, default=2); ap.add_argument('--noise_px', type=float, default=0.0); ap.add_argument('--outlier_rate', type=float, default=0.0); ap.add_argument('--confidence_mode', choices=['calibrated','missing','overconfident_outliers'], default='calibrated'); ap.add_argument('--robust_kernel', choices=['huber','tukey','clip','reject'], default='huber'); ap.add_argument('--reject_threshold', type=float, default=8.0); args=ap.parse_args()
     out = "output/elephant_source_graphdeco/sparse_observation_benchmark"
     source, cameras = load_cpu_source_and_cameras("assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset", "output/elephant_source_graphdeco", 30000)
     base = ObservationBundle.load("output/elephant_source_graphdeco/synthetic_observed_2d_benchmark/clean_8/observed_2d_bundle.pt")
@@ -46,14 +46,15 @@ def main():
                     if args.confidence_mode == 'missing': confidence = None
                     if args.confidence_mode == 'overconfident_outliers': confidence[outlier_mask] = 10.0
                     started=time.perf_counter()
-                    rec=recover_xyz_graph_coupled_cached(cache,observed_xy,vis,confidence,iterations=12,graph_lambda=.01,foreground_mask=fg,jacobian_refresh=1)
+                    rec=recover_xyz_graph_coupled_cached(cache,observed_xy,vis,confidence,iterations=12,graph_lambda=.01,foreground_mask=fg,jacobian_refresh=1,robust_kernel=args.robust_kernel,reject_threshold=args.reject_threshold)
                     report=delta_metrics(rec["d_xyz"],gt,active_mask=active,foreground_mask=fg)
                     report["anchor"] = delta_metrics(rec["d_xyz"],gt,active_mask=active & anchors,foreground_mask=fg)["active"]
                     report["unobserved"] = delta_metrics(rec["d_xyz"],gt,active_mask=active & ~obs,foreground_mask=fg)["active"]
                     report["support"] = observability_report(vis,fg,active)
+                    report["rejected_fraction"] = rec["history"][-1].get("rejected_fraction", 0.0)
                     records.append({"teacher":teacher_name,"mode":mode,"fraction":fraction,"views_per_track":args.views_per_track,
                         "baseline_policy":"max_pairwise_center_baseline" if policy is not None else "random",
-                        "seed":seed,"noise":args.noise_px,"outlier_rate":args.outlier_rate,"confidence_mode":args.confidence_mode,"solver":"symmetric_graph_irls",
+                        "seed":seed,"noise":args.noise_px,"outlier_rate":args.outlier_rate,"confidence_mode":args.confidence_mode,"robust_kernel":args.robust_kernel,"reject_threshold":args.reject_threshold,"solver":"symmetric_graph_irls",
                         "control_count":None,
                         "selected_tracks":int(selected.sum()),"observed_tracks":int(obs.sum()),
                         "triangulatable_tracks":int(anchors.sum()),"report":report,

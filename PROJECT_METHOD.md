@@ -269,3 +269,11 @@ support, baseline, ray angle, and Jacobian condition thresholds. Camera-center
 distance is reported together with ray-angle and condition diagnostics; it is
 not treated as a complete triangulability criterion. Exact-K sampling rejects
 tracks below K original valid views.
+
+Robust correspondence handling supports Huber, Tukey, clipping, and delayed
+cross-view residual rejection. Rejection is recorded separately from
+confidence downweighting; a rejected view is not silently replaced by hidden
+target geometry. Current 5% outlier results remain below the acceptance gate.
+Silhouette observations are stored as signed-distance constraints, never as
+fake target points, but the current synthetic raster-mask experiment is
+inconclusive.

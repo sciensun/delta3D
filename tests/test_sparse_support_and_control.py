@@ -61,3 +61,16 @@ def test_conditioning_metrics_and_eligible_k_views():
     assert float(metrics["ray_angle"].max()) >= 0
     sampled, selected = fixed_views_per_track(visibility, 1.0, 2, torch.ones(4, dtype=torch.bool), 1)
     assert torch.equal(sampled.sum(0), torch.full((4,), 2))
+
+
+def test_rejection_kernel_is_explicit_and_zero_background():
+    class Camera:
+        image_width = 32; image_height = 32; full_proj_transform = torch.eye(4)
+    from correspondence.cpu_recovery import build_geometry_cache, recover_xyz_graph_coupled_cached
+    xyz = torch.randn(8, 3) * .02; cache = build_geometry_cache(xyz, [Camera(), Camera()], knn=2)
+    target = cache['source_views'].clone(); target[0, 0] += 100.0
+    vis = torch.ones(2, 8, dtype=torch.bool); fg = torch.ones(8, dtype=torch.bool); fg[-2:] = False
+    result = recover_xyz_graph_coupled_cached(cache, target, vis, vis.float(), iterations=4,
+                                              foreground_mask=fg, robust_kernel='reject')
+    assert result['history'][-1]['rejected_fraction'] > 0
+    assert torch.allclose(result['d_xyz'][~fg], torch.zeros_like(result['d_xyz'][~fg]))
