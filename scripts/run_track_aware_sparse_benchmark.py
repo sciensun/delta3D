@@ -11,11 +11,11 @@ from correspondence.sparse_sampling import (track_dropout, fixed_views_per_track
                                              observability_report, pairwise_baseline_scores)
 from correspondence.benchmark_artifacts import upsert_records, validate_records
 from stage1.template_factorization import delta_metrics
-from correspondence.track_consensus import leave_one_view_out_consensus
+from correspondence.track_consensus import leave_one_view_out_consensus, subset_hypothesis_consensus
 
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--teachers', nargs='+', default=['body_roundness','ear_expansion','trunk_bending']); ap.add_argument('--modes', nargs='+', default=['track_dropout','exact_k_views_per_track','baseline_maximized_k_views']); ap.add_argument('--fractions', nargs='+', type=float, default=[.1,.2,.4,.6]); ap.add_argument('--seeds', nargs='+', type=int, default=[11,29,47,71,97]); ap.add_argument('--views_per_track', type=int, default=2); ap.add_argument('--noise_px', type=float, default=0.0); ap.add_argument('--outlier_rate', type=float, default=0.0); ap.add_argument('--confidence_mode', choices=['calibrated','missing','overconfident_outliers'], default='calibrated'); ap.add_argument('--robust_kernel', choices=['huber','tukey','clip','reject'], default='huber'); ap.add_argument('--reject_threshold', type=float, default=8.0); ap.add_argument('--track_consensus', action='store_true'); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('--teachers', nargs='+', default=['body_roundness','ear_expansion','trunk_bending']); ap.add_argument('--modes', nargs='+', default=['track_dropout','exact_k_views_per_track','baseline_maximized_k_views']); ap.add_argument('--fractions', nargs='+', type=float, default=[.1,.2,.4,.6]); ap.add_argument('--seeds', nargs='+', type=int, default=[11,29,47,71,97]); ap.add_argument('--views_per_track', type=int, default=2); ap.add_argument('--noise_px', type=float, default=0.0); ap.add_argument('--outlier_rate', type=float, default=0.0); ap.add_argument('--confidence_mode', choices=['calibrated','missing','overconfident_outliers'], default='calibrated'); ap.add_argument('--robust_kernel', choices=['huber','tukey','clip','reject'], default='huber'); ap.add_argument('--reject_threshold', type=float, default=8.0); ap.add_argument('--track_consensus', action='store_true'); ap.add_argument('--consensus_method', choices=['loo','subset'], default='loo'); ap.add_argument('--fallback', choices=['drop_track','keep_best_two','downgrade_confidence'], default='drop_track'); args=ap.parse_args()
     out = "output/elephant_source_graphdeco/sparse_observation_benchmark"
     source, cameras = load_cpu_source_and_cameras("assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset", "output/elephant_source_graphdeco", 30000)
     base = ObservationBundle.load("output/elephant_source_graphdeco/synthetic_observed_2d_benchmark/clean_8/observed_2d_bundle.pt")
@@ -46,7 +46,10 @@ def main():
                         observed_xy[outlier_mask] = torch.rand((int(outlier_mask.sum()), 2), generator=gen) * 1024.0
                     consensus = None
                     if args.track_consensus:
-                        consensus = leave_one_view_out_consensus(cache['source_views'], cache['jacobians'], observed_xy, vis, residual_threshold=args.reject_threshold)
+                        if args.consensus_method == 'subset':
+                            consensus = subset_hypothesis_consensus(cache['source_views'], cache['jacobians'], observed_xy, vis, residual_threshold=args.reject_threshold, fallback=args.fallback)
+                        else:
+                            consensus = leave_one_view_out_consensus(cache['source_views'], cache['jacobians'], observed_xy, vis, residual_threshold=args.reject_threshold, fallback=args.fallback)
                         vis = consensus['accepted_visibility']
                         obs = vis.any(0); supports = vis.sum(0); anchors = fg & (supports >= 2)
                     if consensus is None:
@@ -58,6 +61,8 @@ def main():
                     outlier_views = (outlier_mask & input_vis).sum().item()
                     clean_views = ((~outlier_mask) & input_vis).sum().item()
                     confidence = vis.float()
+                    if consensus is not None and 'track_confidence' in consensus:
+                        confidence = confidence * consensus['track_confidence'][None, :]
                     if args.confidence_mode == 'missing': confidence = None
                     if args.confidence_mode == 'overconfident_outliers': confidence[outlier_mask] = 10.0
                     started=time.perf_counter()
@@ -66,10 +71,20 @@ def main():
                     report["anchor"] = delta_metrics(rec["d_xyz"],gt,active_mask=active & anchors,foreground_mask=fg)["active"]
                     report["unobserved"] = delta_metrics(rec["d_xyz"],gt,active_mask=active & ~obs,foreground_mask=fg)["active"]
                     report["support"] = observability_report(vis,fg,active)
+                    injected = outlier_mask.any(0) & input_vis.any(0)
+                    retained_outlier = (outlier_mask & vis).any(0)
+                    no_outlier = ~injected
+                    all_removed = injected & ~retained_outlier
+                    residual_outlier = injected & retained_outlier
+                    report['track_categories']={
+                        'no_injected_outlier': delta_metrics(rec['d_xyz'],gt,active_mask=active&no_outlier,foreground_mask=fg),
+                        'all_injected_outliers_removed': delta_metrics(rec['d_xyz'],gt,active_mask=active&all_removed,foreground_mask=fg),
+                        'accepted_outlier_remaining': delta_metrics(rec['d_xyz'],gt,active_mask=active&residual_outlier,foreground_mask=fg),
+                        'unobserved': delta_metrics(rec['d_xyz'],gt,active_mask=active&~obs,foreground_mask=fg)}
                     report["rejected_fraction"] = rec["history"][-1].get("rejected_fraction", 0.0)
                     records.append({"teacher":teacher_name,"mode":mode,"fraction":fraction,"views_per_track":args.views_per_track,
                         "baseline_policy":"max_pairwise_center_baseline" if policy is not None else "random",
-                        "seed":seed,"noise":args.noise_px,"outlier_rate":args.outlier_rate,"confidence_mode":args.confidence_mode,"robust_kernel":args.robust_kernel,"reject_threshold":args.reject_threshold,"track_consensus":args.track_consensus,"solver":"symmetric_graph_irls",
+                        "seed":seed,"noise":args.noise_px,"outlier_rate":args.outlier_rate,"confidence_mode":args.confidence_mode,"robust_kernel":args.robust_kernel,"reject_threshold":args.reject_threshold,"track_consensus":args.track_consensus,"consensus_method":args.consensus_method,"fallback":args.fallback,"solver":"symmetric_graph_irls",
                         "control_count":None,
                         "selected_tracks":int(selected.sum()),"observed_tracks":int(obs.sum()),
                         "consensus_rejected_fraction":0.0 if consensus is None else float((input_vis & ~vis).float().sum()/input_vis.float().sum().clamp_min(1)),
@@ -77,6 +92,9 @@ def main():
                         "clean_false_rejection_rate":0.0 if clean_views == 0 else float(false_reject.sum().item()/clean_views),
                         "accepted_view_histogram":{str(k):int((supports==k).sum()) for k in range(int(input_vis.shape[0])+1)},
                         "consensus_available_tracks":int((input_vis.sum(0)>=3).sum()),
+                        "retained_tracks_with_outlier":int(residual_outlier.sum()),
+                        "retained_clean_mass":float(((~outlier_mask)&vis).float().sum()),
+                        "retained_outlier_mass":float((outlier_mask&vis).float().sum()),
                         "triangulatable_tracks":int(anchors.sum()),"report":report,
                         "runtime_seconds":time.perf_counter()-started})
     path=os.path.join(out,"track_aware_sparse_summary.json")

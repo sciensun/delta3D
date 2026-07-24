@@ -1,5 +1,16 @@
 # ChatGPT Handoff: Correspondence Reliability and Silhouette Audit
 
+## Latest Result
+
+Exhaustive pair hypotheses were added. On body exact-3 with 5% overconfident
+outliers, `drop_track` rejected all injected outliers but falsely rejected
+91.1% of clean views and reached active cosine 0.460; `keep_best_two` retained
+24 tracks containing an outlier and reached 0.331. Neither passes. Recovered
+silhouette metrics also degraded: body/ear/trunk IoU/F1/Chamfer changed from
+pre `0.872/0.366/4.68`, `0.905/0.552/3.66`, `0.930/0.633/2.58` to post
+`0.842/0.251/6.78`, `0.855/0.320/6.41`, `0.878/0.357/6.80`. Status remains
+PARTIAL; independent correspondence redundancy is required next.
+
 ## Current Iteration
 
 Status: **PARTIAL**. Clean track-aware recovery is promising, while outlier

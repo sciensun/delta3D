@@ -3,7 +3,8 @@
 DEFAULT_KEY_FIELDS = ("teacher", "mode", "fraction", "views_per_track",
                       "baseline_policy", "seed", "noise", "outlier_rate",
                       "confidence_mode", "robust_kernel", "reject_threshold",
-                      "solver", "control_count")
+                      "solver", "control_count", "track_consensus",
+                      "consensus_method", "fallback")
 
 
 def record_key(record, fields=DEFAULT_KEY_FIELDS):

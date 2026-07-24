@@ -651,6 +651,27 @@ body/ear/trunk `0.000/-0.019/0.004`; null was `-0.004/0.008/-0.013`.
 The control does not show a genuine gain. Tracks-only plus silhouette was not
 claimed because the current clean bundle has no silhouette observations.
 
+## Exact-3 hypothesis audit (2026-07-24)
+
+Exhaustive pair-hypothesis consensus was added for exact-3/4 tracks. It scores
+each pair against all available views and exposes `drop_track`,
+`keep_best_two`, and `downgrade_confidence` policies. On body exact-3,
+fraction 0.20, 5% overconfident outliers, `drop_track` rejected all injected
+outliers but falsely rejected 91.1% of clean views, retained 638 tracks, and
+reached active cosine 0.460. `keep_best_two` retained all 5033 selected
+tracks, retained 24 tracks containing an outlier, and reached active cosine
+0.331. Neither passes the 0.85 gate. Accepted outlier mass, clean mass,
+support histograms, and track-category metrics are serialized in the sparse
+benchmark record.
+
+Silhouette evaluation now includes predicted-mask post-recovery metrics. For
+body/ear/trunk, correct-target IoU/F1/Chamfer changed from pre
+`0.872/0.366/4.68`, `0.905/0.552/3.66`, `0.930/0.633/2.58` to post
+`0.842/0.251/6.78`, `0.855/0.320/6.41`, `0.878/0.357/6.80`. The dynamic
+silhouette update therefore did not improve the output mask; this is a
+silhouette FAIL/inconclusive hybrid result, not a claim that silhouettes are
+useless.
+
 ## Track consensus and silhouette audit (2026-07-24)
 
 The existing delayed `reject` kernel is model-residual-based per-view rejection,

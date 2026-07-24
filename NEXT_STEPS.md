@@ -1,5 +1,13 @@
 # Next Steps
 
+## Exact-3 Audit Update
+
+Pair-hypothesis consensus is implemented, but neither `drop_track` nor
+`keep_best_two` passes: dropping uncertain tracks removes most clean views,
+while keeping pairs leaves destructive ambiguity. The next active experiment
+requires independent correspondence redundancy or local semantic/feature
+validation. Do not mine real targets with either policy.
+
 ## Current Audit (2026-07-24)
 
 Independent per-view dropout remains a FAIL stress test. Clean all-valid-view

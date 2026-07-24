@@ -66,7 +66,7 @@ def boundary_metrics(pred, target):
 
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--teachers', nargs='+', default=['body_roundness','ear_expansion','trunk_bending']); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('--teachers', nargs='+', default=['body_roundness','ear_expansion','trunk_bending']); ap.add_argument('--modes', nargs='+', default=['correct_target','source_mask_null','shuffled_view']); args=ap.parse_args()
     source,cameras=load_cpu_source_and_cameras('assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset','output/elephant_source_graphdeco',30000)
     b=__import__('correspondence.schema',fromlist=['ObservationBundle']).ObservationBundle.load('output/elephant_source_graphdeco/synthetic_observed_2d_benchmark/clean_8/observed_2d_bundle.pt')
     cams=[{c.image_name:c for c in cameras}[n] for n in b.camera_names]; records=[]; root='output/elephant_source_graphdeco/sparse_observation_benchmark/silhouette_assets'
@@ -89,8 +89,16 @@ def main():
                 sdf,g=signed_distance_and_gradient(m); gs.append(g); ss.append(sdf)
             o={'valid':sil_t['valid'],'target_gradient':sil_t['target_gradient'],'target_signed_distance':sil_t['target_signed_distance'],'target_sdf_maps':ss,'target_gradient_maps':gs}
             rr=recover_xyz_from_observations(source,cams,zeros,vis,iterations=8,min_support=0,propagate=False,silhouette_observations=o,silhouette_weight=1.0,dynamic_silhouette=True,foreground_mask=fg)
-            return {'teacher':teacher,'silhouette_mode':label,'delta_metrics':delta_metrics(rr['d_xyz'],gt,active_mask=active,foreground_mask=fg)['active'],'background_energy':float(rr['d_xyz'][~fg].square().sum()),'d_scaling_max':0.0,'target_xyz_in_solver':False,'silhouette_generation':'foreground_filtered_depth_sorted_variable_radius_alpha_splat_cpu_fallback','sdf_assets':teacher_root}
-        records.extend([run_sil('correct_target',tgt_masks),run_sil('source_mask_null',src_masks),run_sil('shuffled_view',tgt_masks[1:]+tgt_masks[:1])])
+            pred_masks=[]; post=[]; sdf_res=[]
+            for vi,c in enumerate(cams):
+                pxy,_,_=project_points(source+rr['d_xyz'],c.full_proj_transform,c.image_width,c.image_height)
+                pd=camera_space_depth(source+rr['d_xyz'],c.world_view_transform).numpy()
+                pm=splat_mask(pxy.numpy(),pd,fg.numpy(),c.image_width,c.image_height); pred_masks.append(pm); post.append(boundary_metrics(pm,tgt_masks[vi]))
+                xx=np.clip(np.rint(pxy[:,0].numpy()).astype(int),0,c.image_width-1); yy=np.clip(np.rint(pxy[:,1].numpy()).astype(int),0,c.image_height-1)
+                sdf_res.append(float(np.abs(sdf_maps[vi][yy,xx]).mean()))
+            return {'teacher':teacher,'silhouette_mode':label,'delta_metrics':delta_metrics(rr['d_xyz'],gt,active_mask=active,foreground_mask=fg)['active'],'background_energy':float(rr['d_xyz'][~fg].square().sum()),'d_scaling_max':0.0,'target_xyz_in_solver':False,'silhouette_generation':'foreground_filtered_depth_sorted_variable_radius_alpha_splat_cpu_fallback','sdf_assets':teacher_root,'pre_image_metrics':{k:float(np.mean([boundary_metrics(src_masks[i],tgt_masks[i])[k] for i in range(len(cams))])) for k in boundary_metrics(src_masks[0],tgt_masks[0])},'post_image_metrics':{k:float(np.mean([x[k] for x in post])) for k in post[0]},'post_target_sdf_abs_mean':float(np.mean(sdf_res))}
+        candidates={'correct_target':tgt_masks,'source_mask_null':src_masks,'shuffled_view':tgt_masks[1:]+tgt_masks[:1]}
+        records.extend([run_sil(label,candidates[label]) for label in args.modes])
         image=[boundary_metrics(src_masks[i],tgt_masks[i]) for i in range(len(cams))]
         records.append({'teacher':teacher,'silhouette_mode':'mask_observation_quality','image_metrics':{k:float(np.mean([x[k] for x in image])) for k in image[0]},'target_xyz_in_solver':False,'silhouette_generation':'foreground_filtered_depth_sorted_variable_radius_alpha_splat_cpu_fallback','sdf_assets':teacher_root})
     path='output/elephant_source_graphdeco/sparse_observation_benchmark/synthetic_silhouette_summary.json'
