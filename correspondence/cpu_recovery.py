@@ -171,7 +171,7 @@ def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=No
         weights = effective_visibility.float() * confidence.clamp_min(0) * robust
         normal = torch.einsum("vn,vnij,vnik->njk", weights, current_jac, current_jac)
         rhs = torch.einsum("vn,vnij,vni->nj", weights, current_jac, residual)
-        normal = torch.nan_to_num(normal) + magnitude_lambda * eye
+        normal = torch.nan_to_num(normal, nan=0.0, posinf=1e6, neginf=0.0) + magnitude_lambda * eye
         rhs = torch.nan_to_num(rhs)
         neighbor_mean = (delta[neighbors] * graph_weights[..., None]).sum(1)
         lhs = torch.nan_to_num(normal + graph_lambda * eye + 1e-2 * eye)
@@ -181,7 +181,17 @@ def recover_xyz_graph_coupled_cached(cache, target_xy, visibility, confidence=No
         rhs_step = rhs + graph_lambda * (neighbor_mean - delta) - magnitude_lambda * delta
         # The explicit diagonal floor keeps all local 3x3 systems positive
         # definite, avoiding a full-bank pseudoinverse allocation.
-        step_update = torch.linalg.solve(lhs, rhs_step)
+        # Rejected views can leave rank-deficient local normals.  Increase the
+        # numeric floor only for ill-conditioned batches.
+        determinant = torch.linalg.det(lhs).abs()
+        bad = ~torch.isfinite(determinant) | (determinant < 1e-8)
+        lhs[bad] = lhs[bad] + 1.0 * eye[bad]
+        try:
+            step_update = torch.linalg.solve(lhs, rhs_step)
+        except RuntimeError:
+            # Batched lstsq is a bounded fallback for occasional singular
+            # normals after consensus rejection.
+            step_update = torch.linalg.lstsq(lhs, rhs_step.unsqueeze(-1)).solution.squeeze(-1)
         step_update[frozen_mask | ~foreground_mask] = 0
         delta = delta + step_update
         active = foreground_mask & ~frozen_mask
@@ -209,12 +219,14 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
                                   confidence=None, iterations=4, huber_delta=3.0,
                                   regularization=1e-4, min_support=2,
                                   propagate=True, silhouette_observations=None,
-                                  silhouette_weight=1.0, point_weight=1.0):
+                                  silhouette_weight=1.0, point_weight=1.0,
+                                  dynamic_silhouette=True, foreground_mask=None):
     source_xyz = torch.as_tensor(source_xyz).float().cpu()
     target_xy = torch.as_tensor(target_xy).float().cpu()
     visibility = torch.as_tensor(visibility).bool().cpu()
     confidence = torch.ones_like(visibility, dtype=torch.float32) if confidence is None else torch.as_tensor(confidence).float().cpu()
     n = source_xyz.shape[0]
+    foreground_mask = torch.ones(n, dtype=torch.bool) if foreground_mask is None else torch.as_tensor(foreground_mask).bool().cpu()
     source_views, jacobians = [], []
     eps = 1e-3
     for camera in cameras:
@@ -255,9 +267,22 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
             if silhouette_observations is not None:
                 sobs = silhouette_observations
                 sv = torch.as_tensor(sobs["valid"][view]).bool()
-                sg = torch.as_tensor(sobs["target_gradient"][view]).float()
+                if dynamic_silhouette and "target_sdf_maps" in sobs:
+                    # Re-evaluate the target SDF at the current projection.
+                    # This keeps silhouette constraints nonlinear and avoids
+                    # treating the original source projection as fixed.
+                    cur_xy = source_views[view] + torch.einsum("nij,nj->ni", jacobians[view], delta)
+                    h, wimg = sobs["target_sdf_maps"][view].shape[-2:]
+                    px = cur_xy[:, 0].round().long().clamp(0, wimg - 1)
+                    py = cur_xy[:, 1].round().long().clamp(0, h - 1)
+                    sdf_map = torch.as_tensor(sobs["target_sdf_maps"][view]).float()
+                    grad_map = torch.as_tensor(sobs["target_gradient_maps"][view]).float()
+                    desired = -sdf_map[py, px]
+                    sg = grad_map[py, px]
+                else:
+                    sg = torch.as_tensor(sobs["target_gradient"][view]).float()
+                    desired = -torch.as_tensor(sobs["target_signed_distance"][view]).float()
                 normal2d = sg / torch.linalg.vector_norm(sg, dim=-1, keepdim=True).clamp_min(1e-6)
-                desired = -torch.as_tensor(sobs["target_signed_distance"][view]).float()
                 sw = sv.float() * float(silhouette_weight)
                 scalar_j = (j * normal2d[:, :, None]).sum(dim=1)
                 silhouette_error = (scalar_j * delta).sum(dim=-1) - desired
@@ -269,6 +294,7 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
         rhs = torch.nan_to_num(rhs)
         solved = torch.bmm(torch.linalg.pinv(normal), rhs.unsqueeze(-1)).squeeze(-1)
         delta = torch.where((support >= min_support)[:, None], solved, torch.zeros_like(solved))
+        delta[~foreground_mask] = 0
     if propagate:
         candidate = (support > 0).numpy()
         known = (support >= min_support).numpy()

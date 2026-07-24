@@ -1,5 +1,14 @@
 # Next Steps
 
+## Current Audit (2026-07-24)
+
+Independent per-view dropout remains a FAIL stress test. Clean all-valid-view
+track-aware recovery is PARTIAL/PROMISING, but exact-3/exact-4 true consensus
+and the matched tracks-plus-silhouette gate are incomplete. Exact-2 rejection
+is underdetermined and must remain a structural-neighbor baseline, not be
+presented as within-track consensus. Stage 2 and real target generation remain
+paused.
+
 ## Active Decision
 
 Validate sparse observation recovery before any real target generation. The

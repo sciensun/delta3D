@@ -650,3 +650,30 @@ and no-point silhouette-only controls. Correct-target active cosine was
 body/ear/trunk `0.000/-0.019/0.004`; null was `-0.004/0.008/-0.013`.
 The control does not show a genuine gain. Tracks-only plus silhouette was not
 claimed because the current clean bundle has no silhouette observations.
+
+## Track consensus and silhouette audit (2026-07-24)
+
+The existing delayed `reject` kernel is model-residual-based per-view rejection,
+not independent cross-view consensus. In the previously recorded 5%
+overconfident-outlier run it improved body/ear/trunk active cosine to
+`0.769/0.772/0.803`, still below the `0.85` gate.
+
+The new leave-one-view-out consensus is defined only for tracks with at least
+three views. Exact-2 tracks are returned unchanged because within-track
+consensus is underdetermined. One body exact-3, fraction-0.2, 5%
+overconfident-outlier diagnostic rejected `55.2%` of injected outlier views,
+falsely rejected `2.1%` of clean views, and left support counts
+`0:39731, 1:0, 2:694, 3:4339`. Its active cosine was `0.004`; this is a
+failed recovery run and not a completed all-teacher gate.
+
+Fixed-radius circle masks were replaced by a documented CPU fallback using
+foreground filtering, camera-depth sorting, variable-radius alpha splats on a
+quarter-resolution buffer, and SDF/gradient extraction. Per-view SDF assets
+are under `output/elephant_source_graphdeco/sparse_observation_benchmark/silhouette_assets/`.
+Target-mask mean IoU / boundary F1 / symmetric Chamfer are body
+`0.872/0.366/4.68`, ear `0.905/0.552/3.66`, trunk `0.930/0.633/2.58` pixels.
+Dynamic SDF sampling is refreshed at nonlinear iterations. Correct-target
+silhouette-only active cosine is approximately `-0.005/-0.020/-0.012` for
+body/ear/trunk, with source-null and shuffled controls not showing a reliable
+gain. This is inconclusive/failed for silhouette-only, not a claim that
+silhouettes are useless; a matched hybrid gate is still pending.

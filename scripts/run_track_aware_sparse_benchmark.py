@@ -11,10 +11,11 @@ from correspondence.sparse_sampling import (track_dropout, fixed_views_per_track
                                              observability_report, pairwise_baseline_scores)
 from correspondence.benchmark_artifacts import upsert_records, validate_records
 from stage1.template_factorization import delta_metrics
+from correspondence.track_consensus import leave_one_view_out_consensus
 
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('--teachers', nargs='+', default=['body_roundness','ear_expansion','trunk_bending']); ap.add_argument('--modes', nargs='+', default=['track_dropout','exact_k_views_per_track','baseline_maximized_k_views']); ap.add_argument('--fractions', nargs='+', type=float, default=[.1,.2,.4,.6]); ap.add_argument('--seeds', nargs='+', type=int, default=[11,29,47,71,97]); ap.add_argument('--views_per_track', type=int, default=2); ap.add_argument('--noise_px', type=float, default=0.0); ap.add_argument('--outlier_rate', type=float, default=0.0); ap.add_argument('--confidence_mode', choices=['calibrated','missing','overconfident_outliers'], default='calibrated'); ap.add_argument('--robust_kernel', choices=['huber','tukey','clip','reject'], default='huber'); ap.add_argument('--reject_threshold', type=float, default=8.0); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('--teachers', nargs='+', default=['body_roundness','ear_expansion','trunk_bending']); ap.add_argument('--modes', nargs='+', default=['track_dropout','exact_k_views_per_track','baseline_maximized_k_views']); ap.add_argument('--fractions', nargs='+', type=float, default=[.1,.2,.4,.6]); ap.add_argument('--seeds', nargs='+', type=int, default=[11,29,47,71,97]); ap.add_argument('--views_per_track', type=int, default=2); ap.add_argument('--noise_px', type=float, default=0.0); ap.add_argument('--outlier_rate', type=float, default=0.0); ap.add_argument('--confidence_mode', choices=['calibrated','missing','overconfident_outliers'], default='calibrated'); ap.add_argument('--robust_kernel', choices=['huber','tukey','clip','reject'], default='huber'); ap.add_argument('--reject_threshold', type=float, default=8.0); ap.add_argument('--track_consensus', action='store_true'); args=ap.parse_args()
     out = "output/elephant_source_graphdeco/sparse_observation_benchmark"
     source, cameras = load_cpu_source_and_cameras("assets/prepared/big_carved_wooden_elephant_sculpture/stage1_5_key8_dataset", "output/elephant_source_graphdeco", 30000)
     base = ObservationBundle.load("output/elephant_source_graphdeco/synthetic_observed_2d_benchmark/clean_8/observed_2d_bundle.pt")
@@ -34,6 +35,7 @@ def main():
                     else:
                         policy = baseline if mode == "baseline_maximized_k_views" else None
                         vis, selected = fixed_views_per_track(base.visibility_2d, fraction, args.views_per_track, fg, seed, baseline_scores=policy)
+                    input_vis = vis.clone()
                     obs = vis.any(0); supports = vis.sum(0); anchors = fg & (supports >= 2)
                     gen = torch.Generator().manual_seed(seed + 7001)
                     observed_xy = xy.clone()
@@ -42,6 +44,19 @@ def main():
                     outlier_mask = vis & (torch.rand(vis.shape, generator=gen) < args.outlier_rate)
                     if outlier_mask.any():
                         observed_xy[outlier_mask] = torch.rand((int(outlier_mask.sum()), 2), generator=gen) * 1024.0
+                    consensus = None
+                    if args.track_consensus:
+                        consensus = leave_one_view_out_consensus(cache['source_views'], cache['jacobians'], observed_xy, vis, residual_threshold=args.reject_threshold)
+                        vis = consensus['accepted_visibility']
+                        obs = vis.any(0); supports = vis.sum(0); anchors = fg & (supports >= 2)
+                    if consensus is None:
+                        true_reject = torch.zeros_like(input_vis)
+                        false_reject = torch.zeros_like(input_vis)
+                    else:
+                        true_reject = outlier_mask & input_vis & ~vis
+                        false_reject = (~outlier_mask) & input_vis & ~vis
+                    outlier_views = (outlier_mask & input_vis).sum().item()
+                    clean_views = ((~outlier_mask) & input_vis).sum().item()
                     confidence = vis.float()
                     if args.confidence_mode == 'missing': confidence = None
                     if args.confidence_mode == 'overconfident_outliers': confidence[outlier_mask] = 10.0
@@ -54,9 +69,14 @@ def main():
                     report["rejected_fraction"] = rec["history"][-1].get("rejected_fraction", 0.0)
                     records.append({"teacher":teacher_name,"mode":mode,"fraction":fraction,"views_per_track":args.views_per_track,
                         "baseline_policy":"max_pairwise_center_baseline" if policy is not None else "random",
-                        "seed":seed,"noise":args.noise_px,"outlier_rate":args.outlier_rate,"confidence_mode":args.confidence_mode,"robust_kernel":args.robust_kernel,"reject_threshold":args.reject_threshold,"solver":"symmetric_graph_irls",
+                        "seed":seed,"noise":args.noise_px,"outlier_rate":args.outlier_rate,"confidence_mode":args.confidence_mode,"robust_kernel":args.robust_kernel,"reject_threshold":args.reject_threshold,"track_consensus":args.track_consensus,"solver":"symmetric_graph_irls",
                         "control_count":None,
                         "selected_tracks":int(selected.sum()),"observed_tracks":int(obs.sum()),
+                        "consensus_rejected_fraction":0.0 if consensus is None else float((input_vis & ~vis).float().sum()/input_vis.float().sum().clamp_min(1)),
+                        "true_outlier_rejection_rate":0.0 if outlier_views == 0 else float(true_reject.sum().item()/outlier_views),
+                        "clean_false_rejection_rate":0.0 if clean_views == 0 else float(false_reject.sum().item()/clean_views),
+                        "accepted_view_histogram":{str(k):int((supports==k).sum()) for k in range(int(input_vis.shape[0])+1)},
+                        "consensus_available_tracks":int((input_vis.sum(0)>=3).sum()),
                         "triangulatable_tracks":int(anchors.sum()),"report":report,
                         "runtime_seconds":time.perf_counter()-started})
     path=os.path.join(out,"track_aware_sparse_summary.json")

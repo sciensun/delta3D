@@ -1,4 +1,19 @@
-# ChatGPT Handoff: Sparse Observation Recovery
+# ChatGPT Handoff: Correspondence Reliability and Silhouette Audit
+
+## Current Iteration
+
+Status: **PARTIAL**. Clean track-aware recovery is promising, while outlier
+robustness and the silhouette/hybrid gate remain incomplete. Exact-2 tracks do
+not support within-track consensus.
+
+The implementation now records true injected-outlier rejection separately from
+clean false rejection, adds leave-one-view-out consensus for >=3-view tracks,
+and replaces fixed circles with a foreground-filtered depth-sorted
+variable-radius alpha-splat CPU fallback plus dynamic SDF sampling. One body
+exact-3 5%-outlier diagnostic rejected 55.2% of injected outlier views and
+falsely rejected 2.1% clean views, but active cosine was 0.004. Correct
+silhouette-only active cosine is about -0.005/-0.020/-0.012 for body/ear/trunk;
+target-mask IoU is 0.872/0.905/0.930. These do not pass the hybrid gate.
 
 ## Status
 
