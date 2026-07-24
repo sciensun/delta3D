@@ -243,6 +243,7 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
         jacobians.append(torch.stack(columns, dim=-1))
     source_views = torch.stack(source_views)
     jacobians = torch.stack(jacobians)
+    base_source_views = source_views.clone()
     residual = target_xy - source_views
     weights = visibility.float() * confidence.clamp_min(0) * float(point_weight)
     support = visibility.sum(0)
@@ -250,8 +251,16 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
         support = support + torch.as_tensor(silhouette_observations["valid"]).bool().sum(0)
     delta = torch.zeros((n, 3), dtype=torch.float32)
     eye = torch.eye(3).expand(n, 3, 3)
+    history = []
     for _ in range(iterations):
-        pred = torch.einsum("vnac,nc->vna", jacobians, delta)
+        if dynamic_silhouette and silhouette_observations is not None and "target_sdf_maps" in silhouette_observations:
+            # Refresh both projections and finite-difference Jacobians at the
+            # current deformed positions; the silhouette term is nonlinear.
+            source_views, jacobians = _project_with_jacobian(source_xyz + delta, cameras, eps)
+        if dynamic_silhouette and silhouette_observations is not None and "target_sdf_maps" in silhouette_observations:
+            pred = source_views - base_source_views
+        else:
+            pred = torch.einsum("vnac,nc->vna", jacobians, delta)
         error = torch.linalg.vector_norm(pred - residual, dim=-1)
         robust = torch.where(error <= huber_delta, torch.ones_like(error), huber_delta / error.clamp_min(1e-6))
         w = weights * robust
@@ -263,7 +272,8 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
             j = jacobians[view]
             ww = w[view]
             normal += torch.einsum("n,nij,nik->njk", ww, j, j)
-            rhs += torch.einsum("n,nij,ni->nj", ww, j, residual[view])
+            point_residual = residual[view] - pred[view]
+            rhs += torch.einsum("n,nij,ni->nj", ww, j, point_residual)
             if silhouette_observations is not None:
                 sobs = silhouette_observations
                 sv = torch.as_tensor(sobs["valid"][view]).bool()
@@ -293,8 +303,22 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
         normal = torch.nan_to_num(normal) + max(regularization, 1e-3) * eye
         rhs = torch.nan_to_num(rhs)
         solved = torch.bmm(torch.linalg.pinv(normal), rhs.unsqueeze(-1)).squeeze(-1)
-        delta = torch.where((support >= min_support)[:, None], solved, torch.zeros_like(solved))
+        old_delta = delta
+        if dynamic_silhouette and silhouette_observations is not None and "target_sdf_maps" in silhouette_observations:
+            # Conservative damping is the CPU fallback's line-search proxy;
+            # the caller can still inspect per-iteration SDF loss in history.
+            delta = old_delta + 0.1 * solved
+        else:
+            delta = torch.where((support >= min_support)[:, None], solved, torch.zeros_like(solved))
         delta[~foreground_mask] = 0
+        sdf_loss = 0.0
+        if silhouette_observations is not None and "target_sdf_maps" in silhouette_observations:
+            for view in range(len(cameras)):
+                xy = source_views[view]
+                px=xy[:,0].round().long().clamp(0,cameras[view].image_width-1); py=xy[:,1].round().long().clamp(0,cameras[view].image_height-1)
+                sdf_loss += float(torch.as_tensor(silhouette_observations['target_sdf_maps'][view]).float()[py,px][torch.as_tensor(silhouette_observations['valid'][view]).bool()].abs().mean())
+            sdf_loss /= max(1,len(cameras))
+        history.append({'iteration':len(history),'sdf_loss':sdf_loss,'update_norm':float((delta-old_delta).norm()),'step_size':0.1 if dynamic_silhouette and silhouette_observations is not None and "target_sdf_maps" in silhouette_observations else 1.0})
     if propagate:
         candidate = (support > 0).numpy()
         known = (support >= min_support).numpy()
@@ -312,7 +336,7 @@ def recover_xyz_from_observations(source_xyz, cameras, target_xy, visibility,
                 pass
     return {"d_xyz": delta, "support_count": support,
             "reprojection_residual": residual, "source_views": source_views,
-            "jacobians": jacobians}
+            "jacobians": jacobians, "history": history}
 
 
 def recover_xyz_graph_coupled(source_xyz, cameras, target_xy, visibility,

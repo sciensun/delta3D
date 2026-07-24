@@ -17,6 +17,14 @@ is underdetermined and must remain a structural-neighbor baseline, not be
 presented as within-track consensus. Stage 2 and real target generation remain
 paused.
 
+## Gated Workflow Result
+
+The available exact-3 synthetic gate now passes after compatible-hypothesis
+repair, but exact-4 remains incomplete and silhouette remains disabled. The
+workflow entered Phase D and stopped as `REAL_ASSET_BLOCKED`: two complete
+eight-view target sets are missing. Provide target_A and target_B using the
+existing standardized manifest, then run QC and the tracks-only extractor.
+
 ## Active Decision
 
 Validate sparse observation recovery before any real target generation. The

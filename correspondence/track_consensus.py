@@ -45,7 +45,8 @@ def leave_one_view_out_consensus(source_views, jacobians, target_xy, visibility,
 def subset_hypothesis_consensus(source_views, jacobians, target_xy, visibility,
                                 residual_threshold=3.0, min_inliers=2,
                                 fallback="drop_track", margin_threshold=0.1,
-                                confidence_scale=0.1):
+                                confidence_scale=0.1,
+                                displacement_threshold=0.05):
     """Select a geometrically consistent subset from K-view tracks.
 
     Every pair is a hypothesis for exact-3/4 tracks. The hypothesis is scored
@@ -63,7 +64,9 @@ def subset_hypothesis_consensus(source_views, jacobians, target_xy, visibility,
                 accepted[valid,i]=True; track_conf[i]=confidence_scale if fallback=="downgrade_confidence" else 1.0
             continue
         candidates=[]
-        for subset in itertools.combinations(valid,2):
+        subset_sizes = (2,) if len(valid) == 3 else (2,3)
+        for subset_size in subset_sizes:
+          for subset in itertools.combinations(valid,subset_size):
             normal=torch.zeros((3,3)); rhs=torch.zeros(3)
             for v in subset:
                 normal += j[v,i].T @ j[v,i]
@@ -74,20 +77,34 @@ def subset_hypothesis_consensus(source_views, jacobians, target_xy, visibility,
             err=torch.stack([(j[v,i]@d-(target[v,i]-sv[v,i])).norm() for v in valid])
             inlier=err<=residual_threshold
             count=int(inlier.sum()); robust=float(torch.where(err<=residual_threshold,err,torch.full_like(err,residual_threshold)).sum())
-            candidates.append((count,-robust,-cond,subset,inlier,err))
+            candidates.append((count,-robust,-cond,subset,inlier,err,d))
         if not candidates: continue
         candidates.sort(key=lambda x:(x[0],x[1],x[2]),reverse=True)
         best=candidates[0]; second=candidates[1] if len(candidates)>1 else None
         score_gap=1.0 if second is None else float(best[0]-second[0])/(max(1,len(valid)))
-        ok=best[0]>=min_inliers and (second is None or score_gap>=margin_threshold)
-        if ok:
+        tied=[c for c in candidates if c[0]==best[0] and abs(c[1]-best[1]) <= max(1.0,abs(best[1])*0.25)]
+        compatible=all(float(torch.linalg.vector_norm(c[6]-best[6])) <= displacement_threshold for c in tied)
+        inlier_sets=[set(torch.tensor(valid)[c[4]].tolist()) for c in tied]
+        common=set.intersection(*inlier_sets) if inlier_sets else set()
+        all_views=best[0] == len(valid)
+        if best[0]>=min_inliers and compatible and (all_views or len(common)>=min_inliers):
+            # Compatible ties are evidence, not ambiguity. For a partial
+            # consensus keep only observations common to the tied hypotheses.
+            chosen=set(valid) if all_views else common
+            accepted[list(chosen),i]=True; track_conf[i]=1.0
+            classification='consistent_all_views' if all_views else 'consistent_subset'
+        elif best[0]>=min_inliers and score_gap>=margin_threshold and compatible:
             accepted[torch.tensor(valid)[best[4]],i]=True; track_conf[i]=1.0
-        elif fallback=="keep_best_two":
+            classification='consistent_subset'
+        else:
+            classification='conflicting_hypotheses' if candidates else 'geometrically_degenerate'
+        ok=classification.startswith('consistent')
+        if not ok and fallback=="keep_best_two":
             accepted[list(best[3]),i]=True; track_conf[i]=1.0
-        elif fallback=="downgrade_confidence":
+        elif not ok and fallback=="downgrade_confidence":
             accepted[:,i]=vis[:,i]; track_conf[i]=confidence_scale; ambiguous[i]=True
         # drop_track leaves the complete track rejected.
-        scores.append({'gaussian':i,'views':valid,'best_subset':list(best[3]),'inliers':int(best[0]),'second_inliers':None if second is None else int(second[0]),'score_gap':score_gap,'accepted':bool(ok),'ambiguous':bool(not ok)})
+        scores.append({'gaussian':i,'views':valid,'best_subset':list(best[3]),'inliers':int(best[0]),'second_inliers':None if second is None else int(second[0]),'score_gap':score_gap,'accepted':bool(ok),'ambiguous':bool(not ok),'classification':classification,'candidate_displacement_distances':[float(torch.linalg.vector_norm(c[6]-best[6])) for c in tied]})
     return {'accepted_visibility':accepted,'track_confidence':track_conf,
             'hypotheses':scores,'ambiguous_tracks':ambiguous,
             'rejected_visibility':vis & ~accepted,'input_visibility':vis,

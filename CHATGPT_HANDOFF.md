@@ -26,6 +26,13 @@ falsely rejected 2.1% clean views, but active cosine was 0.004. Correct
 silhouette-only active cosine is about -0.005/-0.020/-0.012 for body/ear/trunk;
 target-mask IoU is 0.872/0.905/0.930. These do not pass the hybrid gate.
 
+## Gated Workflow Result
+
+The machine decision is `REAL_ASSET_BLOCKED`. The repaired exact-3 gate passes
+for the available three-teacher records, but target_A and target_B contain no
+images. Silhouette remains disabled because its independent synthetic
+post-recovery gate failed. No real mining or Stage 2 training was started.
+
 ## Status
 
 **FAIL / PARTIAL.** The complete-observation sanity check passes, but the

@@ -698,3 +698,20 @@ silhouette-only active cosine is approximately `-0.005/-0.020/-0.012` for
 body/ear/trunk, with source-null and shuffled controls not showing a reliable
 gain. This is inconclusive/failed for silhouette-only, not a claim that
 silhouettes are useless; a matched hybrid gate is still pending.
+
+## Gated workflow result (2026-07-24)
+
+The repaired hypothesis-agreement method passes the available exact-3
+synthetic records: clean/5%-outlier active cosine is body `0.898/0.897`, ear
+`0.880/0.877`, trunk `0.881/0.881`; true rejection is `1.0`, clean false
+rejection is about `0.2%`, and accepted outlier confidence mass is zero. The
+body oracle result is `0.898`. Exact-4 body remains `0.733` in the current
+diagnostic. The machine decision is recorded in
+`output/elephant_source_graphdeco/sparse_observation_benchmark/correspondence_gate_decision.json`.
+
+The workflow entered the real phase but stopped as `REAL_ASSET_BLOCKED`:
+the standardized manifest and prompt exist under
+`assets/prepared/big_carved_wooden_elephant_sculpture/real_pilot_blocky_to_rounded/`,
+but target_A and target_B contain no images. QC found zero complete samples.
+Silhouette is disabled for the real pilot because its independent synthetic
+post-recovery gate failed. No real extraction or Stage 2 training ran.
